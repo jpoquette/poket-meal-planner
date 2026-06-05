@@ -32,8 +32,14 @@ function ShoppingContent() {
     setLoading(false);
   }
 
-  const unpurchased = items.filter((i) => !i.purchased && i.name.toLowerCase().includes(search.toLowerCase()));
-  const purchased = items.filter((i) => i.purchased && i.name.toLowerCase().includes(search.toLowerCase()));
+  const sortItems = (arr) => arr.sort((a, b) =>
+    (a.store || "").localeCompare(b.store || "") ||
+    (a.category || "").localeCompare(b.category || "") ||
+    a.name.localeCompare(b.name)
+  );
+
+  const unpurchased = sortItems(items.filter((i) => !i.purchased && i.name.toLowerCase().includes(search.toLowerCase())));
+  const purchased = sortItems(items.filter((i) => i.purchased && i.name.toLowerCase().includes(search.toLowerCase())));
 
   const handleQuickAdd = async (e) => {
     e.preventDefault();
