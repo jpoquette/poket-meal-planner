@@ -227,17 +227,13 @@ function ShoppingItem({ item, onToggle, onEdit, selectable, selected, onSelect }
       >
         {item.purchased && <span className="text-xs">✓</span>}
       </button>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(item)}>
         <p className={`font-semibold text-sm ${item.purchased ? "line-through text-gray-400" : "text-gray-900"}`}>{item.name}</p>
         <p className="text-xs text-gray-600 mt-0.5">
           {item.quantity ? `${item.quantity} ${item.unit} · ` : ""}{item.category}
         </p>
       </div>
-      <button onClick={() => onEdit(item)} className="text-gray-400 hover:text-gray-600 p-1">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-        </svg>
-      </button>
+      <span className="text-gray-400 text-lg">›</span>
     </li>
   );
 }
