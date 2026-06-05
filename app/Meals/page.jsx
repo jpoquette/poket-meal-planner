@@ -143,13 +143,13 @@ function MealsContent() {
 
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">{modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
-                <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-              </div>
-              <form onSubmit={handleSave} className="space-y-3">
+          <div className="bg-white rounded-2xl w-full max-w-md flex flex-col" style={{maxHeight: '90vh'}}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <h2 className="text-lg font-bold">{modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+            <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+              <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
                 <Field label="Meal Name"><input className={inputCls} placeholder="e.g., Spaghetti Carbonara" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
                 <Field label="Date"><input className={inputCls} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
                 <Field label="Meal Type"><select className={inputCls} value={form.meal_type} onChange={(e) => setForm({ ...form, meal_type: e.target.value })}>{MEAL_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
@@ -166,13 +166,13 @@ function MealsContent() {
                 <Field label="Additional Ingredients"><textarea className={inputCls} placeholder="Any other ingredients not in pantry..." rows={2} value={form.additional_ingredients} onChange={(e) => setForm({ ...form, additional_ingredients: e.target.value })} /></Field>
                 <Field label="Recipe Link (optional)"><input className={inputCls} type="url" placeholder="https://..." value={form.recipe_link} onChange={(e) => setForm({ ...form, recipe_link: e.target.value })} /></Field>
                 <Field label="Notes"><textarea className={inputCls} placeholder="Optional notes..." rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
-                <div className="flex gap-2 pt-1">
-                  {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
-                  <button type="button" onClick={() => setModal(null)} className="flex-1 px-4 py-2 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
-                  <button type="submit" disabled={saving} className="flex-1 px-4 py-2 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
-                </div>
-              </form>
-            </div>
+              </div>
+              <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+                {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
+                <button type="button" onClick={() => setModal(null)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
