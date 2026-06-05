@@ -94,7 +94,7 @@ export default function ShoppingPage() {
 
       <form onSubmit={handleQuickAdd} className="flex gap-2 mb-3">
         <input
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-400"
+          className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-green-400"
           placeholder="Add to shopping list..."
           value={quickAdd}
           onChange={(e) => setQuickAdd(e.target.value)}
@@ -103,7 +103,7 @@ export default function ShoppingPage() {
       </form>
 
       <input
-        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
+        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 bg-white mb-4 focus:outline-none focus:ring-2 focus:ring-green-400"
         placeholder="Search items..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
