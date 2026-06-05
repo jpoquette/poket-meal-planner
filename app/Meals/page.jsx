@@ -254,7 +254,7 @@ export default function MealsPage() {
 function Field({ label, children }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );
@@ -265,4 +265,4 @@ function mealEmoji(type) {
   return map[type] || "🍽️";
 }
 
-const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white";
+const inputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 bg-white";

@@ -228,8 +228,8 @@ function ShoppingItem({ item, onToggle, onEdit, selectable, selected, onSelect }
         {item.purchased && <span className="text-xs">✓</span>}
       </button>
       <div className="flex-1 min-w-0">
-        <p className={`font-medium text-sm ${item.purchased ? "line-through text-gray-400" : ""}`}>{item.name}</p>
-        <p className="text-xs text-gray-400">
+        <p className={`font-semibold text-sm ${item.purchased ? "line-through text-gray-400" : "text-gray-900"}`}>{item.name}</p>
+        <p className="text-xs text-gray-600 mt-0.5">
           {item.quantity ? `${item.quantity} ${item.unit} · ` : ""}{item.category}
         </p>
       </div>
@@ -245,10 +245,10 @@ function ShoppingItem({ item, onToggle, onEdit, selectable, selected, onSelect }
 function Field({ label, children }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );
 }
 
-const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white";
+const inputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 bg-white";

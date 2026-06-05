@@ -17,11 +17,13 @@ export default function PantryPage() {
 
   if (!loaded) return null;
 
-  const filtered = items.filter((item) => {
-    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = categoryFilter === "All" || item.category === categoryFilter;
-    return matchSearch && matchCat;
-  });
+  const filtered = items
+    .filter((item) => {
+      const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
+      const matchCat = categoryFilter === "All" || item.category === categoryFilter;
+      return matchSearch && matchCat;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const handleQuickAdd = (e) => {
     e.preventDefault();
@@ -92,17 +94,19 @@ export default function PantryPage() {
 
       <ul className="space-y-2 mb-4">
         {filtered.map((item) => (
-          <li key={item.id} className="bg-white rounded-xl p-3 flex items-center justify-between border border-gray-100 shadow-sm">
+          <li
+            key={item.id}
+            onClick={() => openEdit(item)}
+            className="bg-white rounded-xl p-3 flex items-center justify-between border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
+          >
             <div>
-              <p className="font-medium text-sm">{item.name}</p>
-              <p className="text-xs text-gray-400">
+              <p className="font-semibold text-sm text-gray-900">{item.name}</p>
+              <p className="text-xs text-gray-600 mt-0.5">
                 {item.quantity ? `${item.quantity} ${item.unit}` : ""}
                 {item.category && item.category !== "Other" ? ` · ${item.category}` : ""}
               </p>
             </div>
-            <button onClick={() => openEdit(item)} className="text-gray-400 hover:text-gray-600 p-1">
-              <PencilIcon />
-            </button>
+            <span className="text-gray-400 text-lg">›</span>
           </li>
         ))}
       </ul>
@@ -171,7 +175,7 @@ export default function PantryPage() {
 function Field({ label, children }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );
@@ -185,4 +189,4 @@ function PencilIcon() {
   );
 }
 
-const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white";
+const inputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-400 bg-white";
