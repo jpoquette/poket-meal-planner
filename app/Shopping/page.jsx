@@ -6,7 +6,8 @@ import { AuthGuard } from "../components/AuthGuard";
 
 const UNITS = ["bags", "bottles", "cans", "cups", "dozen", "fillets", "gallons", "items", "lbs", "liters", "oz", "packages"];
 const CATEGORIES = ["Beverages", "Canned Goods", "Condiments", "Dairy", "Deli", "Frozen", "Grains & Bread", "Meat & Seafood", "Other", "Produce", "Snacks", "Spices"];
-const EMPTY_FORM = { name: "", quantity: "", unit: "items", category: "Other", notes: "" };
+const STORES = ["Aldis", "CostCo", "Festival", "Other", "Pick N Save", "Piggly Wiggle", "Wagners"];
+const EMPTY_FORM = { name: "", quantity: "", unit: "items", category: "Other", store: "", notes: "" };
 
 function ShoppingContent() {
   const user = useUser();
@@ -51,7 +52,7 @@ function ShoppingContent() {
 
   const openAdd = () => { setForm(EMPTY_FORM); setModal("add"); };
   const openEdit = (item) => {
-    setForm({ name: item.name, quantity: item.quantity ?? "", unit: item.unit || "items", category: item.category || "Other", notes: item.notes || "" });
+    setForm({ name: item.name, quantity: item.quantity ?? "", unit: item.unit || "items", category: item.category || "Other", store: item.store || "", notes: item.notes || "" });
     setModal(item.id);
   };
 
@@ -154,6 +155,12 @@ function ShoppingContent() {
                   <Field label="Unit"><select className={inputCls} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>{UNITS.map((u) => <option key={u}>{u}</option>)}</select></Field>
                 </div>
                 <Field label="Category"><select className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
+                <Field label="Store">
+                  <select className={inputCls} value={form.store} onChange={(e) => setForm({ ...form, store: e.target.value })}>
+                    <option value="">Select store</option>
+                    {STORES.map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                </Field>
                 <Field label="Notes"><textarea className={inputCls} placeholder="Optional notes..." rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
               </div>
               <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
@@ -182,7 +189,7 @@ function ShoppingItem({ item, onToggle, onEdit, selectable, selected, onSelect }
       </button>
       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(item)}>
         <p className={`font-semibold text-sm ${item.purchased ? "line-through text-gray-400" : "text-gray-900"}`}>{item.name}</p>
-        <p className="text-xs text-gray-600 mt-0.5">{item.quantity ? `${item.quantity} ${item.unit} · ` : ""}{item.category}</p>
+        <p className="text-xs text-gray-600 mt-0.5">{item.quantity ? `${item.quantity} ${item.unit} · ` : ""}{item.category}{item.store ? ` · ${item.store}` : ""}</p>
       </div>
       <span className="text-gray-400 text-lg">›</span>
     </li>
