@@ -195,7 +195,7 @@ function ShoppingItem({ item, onToggle, onEdit, selectable, selected, onSelect }
       </button>
       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(item)}>
         <p className={`font-semibold text-sm ${item.purchased ? "line-through text-gray-400" : "text-gray-900"}`}>{item.name}</p>
-        <p className="text-xs text-gray-600 mt-0.5">{item.quantity ? `${item.quantity} ${item.unit} · ` : ""}{item.category}{item.store ? ` · ${item.store}` : ""}</p>
+        <p className="text-xs text-gray-600 mt-0.5">{item.store ? `${item.store} · ` : ""}{item.category}{item.quantity ? ` · ${item.quantity} ${item.unit}` : ""}</p>
       </div>
       <span className="text-gray-400 text-lg">›</span>
     </li>
