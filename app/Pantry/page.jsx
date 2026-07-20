@@ -26,7 +26,7 @@ function PantryContent() {
 
   async function loadItems() {
     setLoading(true);
-    const { data } = await supabase.from("pantry").select("*").eq("user_id", user.id).order("name");
+    const { data } = await supabase.from("mp_pantry").select("*").eq("user_id", user.id).order("name");
     setItems(data || []);
     setLoading(false);
   }
@@ -40,7 +40,7 @@ function PantryContent() {
   const handleQuickAdd = async (e) => {
     e.preventDefault();
     if (!quickAdd.trim()) return;
-    const { data } = await supabase.from("pantry").insert({ user_id: user.id, name: quickAdd.trim(), quantity: 1, unit: "items", category: "Other" }).select().single();
+    const { data } = await supabase.from("mp_pantry").insert({ user_id: user.id, name: quickAdd.trim(), quantity: 1, unit: "items", category: "Other" }).select().single();
     if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
     setQuickAdd("");
   };
@@ -57,10 +57,10 @@ function PantryContent() {
     setSaving(true);
     const payload = { ...form, quantity: form.quantity === "" ? null : Number(form.quantity), date_acquired: form.date_acquired || null, expiration_date: form.expiration_date || null };
     if (modal === "add") {
-      const { data } = await supabase.from("pantry").insert({ ...payload, user_id: user.id }).select().single();
+      const { data } = await supabase.from("mp_pantry").insert({ ...payload, user_id: user.id }).select().single();
       if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
     } else {
-      const { data } = await supabase.from("pantry").update(payload).eq("id", modal).select().single();
+      const { data } = await supabase.from("mp_pantry").update(payload).eq("id", modal).select().single();
       if (data) setItems((prev) => prev.map((i) => i.id === modal ? data : i).sort((a, b) => a.name.localeCompare(b.name)));
     }
     setSaving(false);
@@ -68,7 +68,7 @@ function PantryContent() {
   };
 
   const handleDelete = async (id) => {
-    await supabase.from("pantry").delete().eq("id", id);
+    await supabase.from("mp_pantry").delete().eq("id", id);
     setItems((prev) => prev.filter((i) => i.id !== id));
     setModal(null);
   };

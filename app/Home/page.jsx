@@ -24,10 +24,10 @@ function HomeContent() {
 
     async function load() {
       const [{ count: pCount }, { count: expCount }, { count: sCount }, { data: meals }] = await Promise.all([
-        supabase.from("pantry").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("pantry").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("expiration_date", todayStr).lte("expiration_date", in7daysStr),
-        supabase.from("shopping").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("purchased", false),
-        supabase.from("meals").select("*").eq("user_id", user.id).eq("date", todayStr),
+        supabase.from("mp_pantry").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("mp_pantry").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("expiration_date", todayStr).lte("expiration_date", in7daysStr),
+        supabase.from("mp_shopping").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("purchased", false),
+        supabase.from("mp_meals").select("*").eq("user_id", user.id).eq("date", todayStr),
       ]);
       setPantryCount(pCount || 0);
       setExpiringCount(expCount || 0);

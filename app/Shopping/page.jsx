@@ -27,7 +27,7 @@ function ShoppingContent() {
 
   async function loadItems() {
     setLoading(true);
-    const { data } = await supabase.from("shopping").select("*").eq("user_id", user.id).order("name");
+    const { data } = await supabase.from("mp_shopping").select("*").eq("user_id", user.id).order("name");
     setItems(data || []);
     setLoading(false);
   }
@@ -44,14 +44,14 @@ function ShoppingContent() {
   const handleQuickAdd = async (e) => {
     e.preventDefault();
     if (!quickAdd.trim()) return;
-    const { data } = await supabase.from("shopping").insert({ user_id: user.id, name: quickAdd.trim(), unit: "items", category: "Other", purchased: false }).select().single();
+    const { data } = await supabase.from("mp_shopping").insert({ user_id: user.id, name: quickAdd.trim(), unit: "items", category: "Other", purchased: false }).select().single();
     if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
     setQuickAdd("");
   };
 
   const togglePurchased = async (id) => {
     const item = items.find((i) => i.id === id);
-    const { data } = await supabase.from("shopping").update({ purchased: !item.purchased }).eq("id", id).select().single();
+    const { data } = await supabase.from("mp_shopping").update({ purchased: !item.purchased }).eq("id", id).select().single();
     if (data) setItems((prev) => prev.map((i) => i.id === id ? data : i));
     setSelectedPurchased((sel) => sel.filter((s) => s !== id));
   };
@@ -68,10 +68,10 @@ function ShoppingContent() {
     setSaving(true);
     const payload = { ...form, quantity: form.quantity === "" ? null : Number(form.quantity) };
     if (modal === "add") {
-      const { data } = await supabase.from("shopping").insert({ ...payload, user_id: user.id, purchased: false }).select().single();
+      const { data } = await supabase.from("mp_shopping").insert({ ...payload, user_id: user.id, purchased: false }).select().single();
       if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
     } else {
-      const { data } = await supabase.from("shopping").update(payload).eq("id", modal).select().single();
+      const { data } = await supabase.from("mp_shopping").update(payload).eq("id", modal).select().single();
       if (data) setItems((prev) => prev.map((i) => i.id === modal ? data : i).sort((a, b) => a.name.localeCompare(b.name)));
     }
     setSaving(false);
@@ -79,7 +79,7 @@ function ShoppingContent() {
   };
 
   const handleDelete = async (id) => {
-    await supabase.from("shopping").delete().eq("id", id);
+    await supabase.from("mp_shopping").delete().eq("id", id);
     setItems((prev) => prev.filter((i) => i.id !== id));
     setModal(null);
   };
@@ -91,15 +91,15 @@ function ShoppingContent() {
     const toMove = items.filter((i) => selectedPurchased.includes(i.id));
     const pantryRows = toMove.map((i) => ({ user_id: user.id, name: i.name, quantity: i.quantity || 1, unit: i.unit || "items", category: i.category || "Other", date_acquired: new Date().toISOString().split("T")[0] }));
     await Promise.all([
-      supabase.from("pantry").insert(pantryRows),
-      supabase.from("shopping").delete().in("id", selectedPurchased),
+      supabase.from("mp_pantry").insert(pantryRows),
+      supabase.from("mp_shopping").delete().in("id", selectedPurchased),
     ]);
     setItems((prev) => prev.filter((i) => !selectedPurchased.includes(i.id)));
     setSelectedPurchased([]);
   };
 
   const clearPurchased = async () => {
-    await supabase.from("shopping").delete().in("id", selectedPurchased);
+    await supabase.from("mp_shopping").delete().in("id", selectedPurchased);
     setItems((prev) => prev.filter((i) => !selectedPurchased.includes(i.id)));
     setSelectedPurchased([]);
   };

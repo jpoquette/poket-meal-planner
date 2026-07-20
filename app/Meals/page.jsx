@@ -27,8 +27,8 @@ function MealsContent() {
   useEffect(() => {
     if (!user) return;
     Promise.all([
-      supabase.from("meals").select("*").eq("user_id", user.id),
-      supabase.from("pantry").select("id, name, quantity, unit").eq("user_id", user.id).order("name"),
+      supabase.from("mp_meals").select("*").eq("user_id", user.id),
+      supabase.from("mp_pantry").select("id, name, quantity, unit").eq("user_id", user.id).order("name"),
     ]).then(([{ data: m }, { data: p }]) => {
       setMeals(m || []);
       setPantryItems(p || []);
@@ -51,10 +51,10 @@ function MealsContent() {
     if (!form.name.trim()) return;
     setSaving(true);
     if (modal === "add") {
-      const { data } = await supabase.from("meals").insert({ ...form, user_id: user.id }).select().single();
+      const { data } = await supabase.from("mp_meals").insert({ ...form, user_id: user.id }).select().single();
       if (data) setMeals((prev) => [...prev, data]);
     } else {
-      const { data } = await supabase.from("meals").update(form).eq("id", modal).select().single();
+      const { data } = await supabase.from("mp_meals").update(form).eq("id", modal).select().single();
       if (data) setMeals((prev) => prev.map((m) => m.id === modal ? data : m));
     }
     setSaving(false);
@@ -62,7 +62,7 @@ function MealsContent() {
   };
 
   const handleDelete = async (id) => {
-    await supabase.from("meals").delete().eq("id", id);
+    await supabase.from("mp_meals").delete().eq("id", id);
     setMeals((prev) => prev.filter((m) => m.id !== id));
     setModal(null);
   };
