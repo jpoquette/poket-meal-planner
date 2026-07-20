@@ -6,17 +6,21 @@ import { AuthGuard } from "../components/AuthGuard";
 
 const MEAL_TYPES = ["Breakfast", "Lunch", "Dinner", "Snack"];
 const EMPTY_FORM = { name: "", date: "", meal_type: "Dinner", pantry_search: "", additional_ingredients: "", recipe_link: "", notes: "" };
+const VIEWS = ["1 Week", "2 Weeks", "Month"];
 
 function toDateStr(date) { return date.toISOString().split("T")[0]; }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function startOfWeek(date) { const d = new Date(date); d.setDate(d.getDate() - d.getDay()); return d; }
+function startOfMonth(date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
 
 function MealsContent() {
   const user = useUser();
   const [meals, setMeals] = useState([]);
   const [pantryItems, setPantryItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("1 Week");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [monthStart, setMonthStart] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -36,12 +40,48 @@ function MealsContent() {
     });
   }, [user]);
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const weekLabel = `${weekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${weekDays[6].toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-  const monthLabel = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const goToToday = () => {
+    const now = new Date();
+    setWeekStart(startOfWeek(now));
+    setMonthStart(startOfMonth(now));
+    setSelectedDate(toDateStr(now));
+  };
 
+  const navigatePrev = () => {
+    if (view === "Month") setMonthStart((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+    else if (view === "2 Weeks") setWeekStart((d) => addDays(d, -14));
+    else setWeekStart((d) => addDays(d, -7));
+  };
+  const navigateNext = () => {
+    if (view === "Month") setMonthStart((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+    else if (view === "2 Weeks") setWeekStart((d) => addDays(d, 14));
+    else setWeekStart((d) => addDays(d, 7));
+  };
+
+  const getDays = () => {
+    if (view === "Month") {
+      const year = monthStart.getFullYear();
+      const month = monthStart.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      return Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
+    }
+    const count = view === "2 Weeks" ? 14 : 7;
+    return Array.from({ length: count }, (_, i) => addDays(weekStart, i));
+  };
+
+  const days = getDays();
+
+  const getPeriodLabel = () => {
+    if (view === "Month") return monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const last = days[days.length - 1];
+    return `${days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${last.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  };
+
+  const monthLabel = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const selectedMeals = meals.filter((m) => m.date === selectedDate);
-  const upcomingMeals = meals.filter((m) => m.date >= today && m.date <= toDateStr(addDays(new Date(), 7))).sort((a, b) => a.date.localeCompare(b.date) || MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type));
+  const upcomingMeals = meals
+    .filter((m) => m.date >= today && m.date <= toDateStr(addDays(new Date(), 7)))
+    .sort((a, b) => a.date.localeCompare(b.date) || MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type));
 
   const openAdd = () => { setForm({ ...EMPTY_FORM, date: selectedDate }); setModal("add"); };
   const openEdit = (meal) => { setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" }); setModal(meal.id); };
@@ -74,41 +114,85 @@ function MealsContent() {
 
   return (
     <div className="px-4 pt-6">
-      <h1 className="text-2xl font-bold">Meal Planning</h1>
-      <p className="text-sm text-gray-500 mb-4">{monthLabel}</p>
-
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-1 text-gray-400 hover:text-gray-600">‹</button>
-        <p className="flex-1 text-center text-sm font-medium text-gray-600">{weekLabel}</p>
-        <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="p-1 text-gray-400 hover:text-gray-600">›</button>
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h1 className="text-2xl font-bold">Meal Planning</h1>
+          <p className="text-sm text-gray-500">{monthLabel}</p>
+        </div>
+        <button onClick={goToToday} className="mt-1 px-4 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">Today</button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-5">
-        {weekDays.map((d) => {
-          const ds = toDateStr(d);
-          const isToday = ds === today;
-          const isSelected = ds === selectedDate;
-          const hasMeals = meals.some((m) => m.date === ds);
-          return (
-            <button key={ds} onClick={() => setSelectedDate(ds)}
-              className={`flex flex-col items-center py-2 rounded-xl transition-colors ${isSelected ? "bg-green-500 text-white" : isToday ? "bg-green-50 text-green-700" : "text-gray-600"}`}>
-              <span className="text-xs font-medium">{d.toLocaleDateString("en-US", { weekday: "short" })}</span>
-              <span className="text-sm font-bold">{d.getDate()}</span>
-              {hasMeals && <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? "bg-white" : "bg-green-400"}`} />}
-            </button>
-          );
-        })}
+      <div className="flex bg-white rounded-xl border border-gray-200 p-1 mb-4 mt-4">
+        {VIEWS.map((v) => (
+          <button key={v} onClick={() => setView(v)}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${view === v ? "bg-white shadow text-gray-900 border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+            {v}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+          <button onClick={navigatePrev} className="p-1 text-gray-400 hover:text-gray-600">‹</button>
+          <p className="flex-1 text-center text-sm font-medium text-gray-600">{getPeriodLabel()}</p>
+          <button onClick={navigateNext} className="p-1 text-gray-400 hover:text-gray-600">›</button>
+        </div>
+
+        {view === "Month" ? (
+          <div className="grid grid-cols-7 gap-px bg-gray-100">
+            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
+              <div key={d} className="bg-white text-center text-xs font-medium text-gray-400 py-1">{d}</div>
+            ))}
+            {Array.from({ length: days[0].getDay() }).map((_, i) => <div key={`e${i}`} className="bg-white" />)}
+            {days.map((d) => {
+              const ds = toDateStr(d);
+              const isToday = ds === today;
+              const isSelected = ds === selectedDate;
+              const hasMeals = meals.some((m) => m.date === ds);
+              return (
+                <button key={ds} onClick={() => setSelectedDate(ds)}
+                  className={`bg-white flex flex-col items-center py-2 transition-colors ${isSelected ? "bg-green-500 text-white" : isToday ? "bg-green-50 text-green-700" : "text-gray-700 hover:bg-gray-50"}`}>
+                  <span className={`text-xs font-bold ${isSelected ? "text-white" : ""}`}>{d.getDate()}</span>
+                  {hasMeals && <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? "bg-white" : "bg-green-400"}`} />}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1 p-2">
+            {days.map((d) => {
+              const ds = toDateStr(d);
+              const isToday = ds === today;
+              const isSelected = ds === selectedDate;
+              const hasMeals = meals.some((m) => m.date === ds);
+              return (
+                <button key={ds} onClick={() => setSelectedDate(ds)}
+                  className={`flex flex-col items-center py-2 rounded-xl transition-colors ${isSelected ? "bg-green-500 text-white" : isToday ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50"}`}>
+                  <span className="text-xs font-medium">{d.toLocaleDateString("en-US", { weekday: "short" })}</span>
+                  <span className="text-sm font-bold">{d.getDate()}</span>
+                  {hasMeals && <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? "bg-white" : "bg-green-400"}`} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-900">{selectedDayLabel}</h2>
-          <button onClick={openAdd} className="bg-green-500 text-white text-xs px-3 py-1.5 rounded-full font-medium hover:bg-green-600">Add Meal</button>
+          <button onClick={openAdd} className="bg-green-500 text-white text-xs px-3 py-1.5 rounded-full font-medium hover:bg-green-600 flex items-center gap-1">
+            <span>+</span> Add Meal
+          </button>
         </div>
         {selectedMeals.length === 0 ? (
           <div className="text-center py-6">
-            <p className="text-2xl mb-2">🍽️</p>
-            <p className="text-sm text-gray-500">No meals planned</p>
+            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+              </svg>
+            </div>
+            <p className="text-sm text-gray-500 font-medium">No meals planned</p>
             <p className="text-xs text-gray-400">Plan your meals for this day</p>
           </div>
         ) : (
@@ -125,8 +209,8 @@ function MealsContent() {
       </div>
 
       {upcomingMeals.length > 0 && (
-        <div>
-          <h2 className="font-semibold text-gray-700 mb-2 text-sm uppercase tracking-wide">Upcoming This Week</h2>
+        <div className="mb-4">
+          <h2 className="font-semibold text-gray-500 mb-2 text-xs uppercase tracking-widest">Upcoming This Week</h2>
           <ul className="space-y-2">
             {upcomingMeals.map((meal) => (
               <li key={meal.id} className="bg-white rounded-xl p-3 flex items-center gap-3 border border-gray-100 shadow-sm cursor-pointer" onClick={() => openEdit(meal)}>
