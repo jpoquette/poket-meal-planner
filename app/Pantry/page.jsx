@@ -77,8 +77,13 @@ function PantryContent() {
 
   return (
     <div className="px-4 pt-6">
-      <h1 className="text-2xl font-bold">Pantry</h1>
-      <p className="text-sm text-gray-500 mb-4">Track what you have at home</p>
+      <div className="flex items-center gap-3 mb-4">
+        <img src="/app-icon.png" alt="POKET" className="w-12 h-12 rounded-xl shadow-sm" />
+        <div>
+          <h1 className="text-2xl font-bold">Pantry</h1>
+          <p className="text-sm text-gray-500">Track what you have at home</p>
+        </div>
+      </div>
 
       <form onSubmit={handleQuickAdd} className="flex gap-2 mb-3">
         <input className={inputCls + " flex-1"} placeholder="Quick add an item..." value={quickAdd} onChange={(e) => setQuickAdd(e.target.value)} />

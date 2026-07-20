@@ -38,8 +38,13 @@ function HomeContent() {
 
   return (
     <div className="px-4 pt-6">
-      <p className="text-sm text-gray-500 mb-1">{todayLabel}</p>
-      <h1 className="text-2xl font-bold mb-5">Kitchen Overview</h1>
+      <div className="flex items-center gap-3 mb-5">
+        <img src="/app-icon.png" alt="POKET" className="w-12 h-12 rounded-xl shadow-sm" />
+        <div>
+          <p className="text-sm text-gray-500">{todayLabel}</p>
+          <h1 className="text-2xl font-bold">Kitchen Overview</h1>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Link href="/Pantry" className="bg-[#eaf4ee] rounded-2xl p-4 shadow-sm border border-[#d0e8d8] hover:shadow-md transition-shadow">

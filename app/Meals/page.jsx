@@ -115,9 +115,12 @@ function MealsContent() {
   return (
     <div className="px-4 pt-6">
       <div className="flex items-start justify-between mb-1">
-        <div>
-          <h1 className="text-2xl font-bold">Meal Planning</h1>
-          <p className="text-sm text-gray-500">{monthLabel}</p>
+        <div className="flex items-center gap-3">
+          <img src="/app-icon.png" alt="POKET" className="w-12 h-12 rounded-xl shadow-sm" />
+          <div>
+            <h1 className="text-2xl font-bold">Meal Planning</h1>
+            <p className="text-sm text-gray-500">{monthLabel}</p>
+          </div>
         </div>
         <button onClick={goToToday} className="mt-1 px-4 py-1.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">Today</button>
       </div>
