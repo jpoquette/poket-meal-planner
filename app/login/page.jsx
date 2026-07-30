@@ -32,6 +32,8 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
+    const expiry = Date.now() + 90 * 24 * 60 * 60 * 1000;
+    localStorage.setItem("poket-auth-expiry", String(expiry));
     router.replace("/Home");
   };
 

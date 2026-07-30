@@ -19,6 +19,7 @@ export default function NavBar() {
   if (!user || pathname === "/login") return null;
 
   const handleSignOut = async () => {
+    localStorage.removeItem("poket-auth-expiry");
     await supabase.auth.signOut();
     router.replace("/login");
   };
