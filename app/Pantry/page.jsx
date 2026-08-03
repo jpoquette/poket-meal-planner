@@ -127,8 +127,8 @@ function PantryContent() {
       </button>
 
       {modal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md flex flex-col" style={{maxHeight: '90vh'}}>
+        <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
+          <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <h2 className="text-lg font-bold">{modal === "add" ? "Add Item" : "Edit Item"}</h2>
               <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
