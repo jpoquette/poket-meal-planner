@@ -285,15 +285,13 @@ function MealsContent() {
     if (meal.completed) return;
     const ingredientNames = (meal.additional_ingredients || "")
       .split("\n").map((line) => line.split(" — ")[0].trim()).filter(Boolean);
+    let matches = [];
     if (ingredientNames.length > 0) {
-      const { data: matches } = await supabase.from("mp_pantry").select("id, name")
+      const { data } = await supabase.from("mp_pantry").select("id, name")
         .eq("user_id", user.id).in("name", ingredientNames);
-      if (matches?.length > 0) {
-        setCompleteConfirm({ meal, matchedItems: matches, selectedItems: matches.map((i) => i.id) });
-        return;
-      }
+      matches = data || [];
     }
-    await markMealComplete(meal.id);
+    setCompleteConfirm({ meal, matchedItems: matches, selectedItems: matches.map((i) => i.id) });
   };
 
   const markMealComplete = async (id) => {
@@ -420,10 +418,10 @@ function MealsContent() {
             {selectedMeals.sort((a, b) => MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type)).map((meal) => (
               <li key={meal.id} className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${meal.completed ? "opacity-60" : "hover:bg-gray-50"}`}>
                 <button onClick={(e) => handleComplete(meal, e)}
-                  className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                    meal.completed ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-green-400"
+                  className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                    meal.completed ? "bg-green-500 border-green-500" : "border-gray-300 hover:border-green-400 hover:bg-green-50"
                   }`}>
-                  {meal.completed && <span className="text-xs">✓</span>}
+                  <span className={`text-xs font-bold leading-none ${meal.completed ? "text-white" : "text-gray-300"}`}>✓</span>
                 </button>
                 <span className="text-xl">{mealEmoji(meal.meal_type)}</span>
                 <div className="flex-1 cursor-pointer" onClick={() => !meal.completed && openEdit(meal)}>
@@ -705,33 +703,52 @@ function MealsContent() {
             <div className="px-5 pt-5 pb-3 border-b border-gray-100">
               <h2 className="text-lg font-bold">Remove from Pantry?</h2>
             </div>
-            <div className="overflow-y-auto flex-1 px-5 py-4">
-              <p className="text-sm text-gray-600 mb-3">
-                These ingredients from <span className="font-semibold">{completeConfirm.meal.name}</span> are in your pantry. Remove the ones you used?
-              </p>
-              <ul className="space-y-1.5">
-                {completeConfirm.matchedItems.map((item) => (
-                  <li key={item.id} onClick={() => toggleCompleteItem(item.id)}
-                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
-                      completeConfirm.selectedItems.includes(item.id) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
-                    }`}>
-                    <input type="checkbox" checked={completeConfirm.selectedItems.includes(item.id)}
-                      onChange={() => toggleCompleteItem(item.id)} onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 accent-green-500 flex-shrink-0" />
-                    <span className="text-sm text-gray-800">{item.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-              <button onClick={() => confirmComplete(false)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
-                Keep in Pantry
-              </button>
-              <button onClick={() => confirmComplete(true)} disabled={completeConfirm.selectedItems.length === 0}
-                className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-40">
-                Remove ({completeConfirm.selectedItems.length})
-              </button>
-            </div>
+            {completeConfirm.matchedItems.length > 0 ? (
+              <>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                  <p className="text-sm text-gray-600 mb-3">
+                    These ingredients from <span className="font-semibold">{completeConfirm.meal.name}</span> are in your pantry. Remove the ones you used?
+                  </p>
+                  <ul className="space-y-1.5">
+                    {completeConfirm.matchedItems.map((item) => (
+                      <li key={item.id} onClick={() => toggleCompleteItem(item.id)}
+                        className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
+                          completeConfirm.selectedItems.includes(item.id) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
+                        }`}>
+                        <input type="checkbox" checked={completeConfirm.selectedItems.includes(item.id)}
+                          onChange={() => toggleCompleteItem(item.id)} onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 accent-green-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-800">{item.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={() => confirmComplete(false)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                    Keep in Pantry
+                  </button>
+                  <button onClick={() => confirmComplete(true)} disabled={completeConfirm.selectedItems.length === 0}
+                    className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-40">
+                    Remove ({completeConfirm.selectedItems.length})
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="px-5 py-6 text-center">
+                  <p className="text-sm text-gray-600">Mark <span className="font-semibold">{completeConfirm.meal.name}</span> as complete?</p>
+                  <p className="text-xs text-gray-400 mt-1">No matching pantry items found for this meal.</p>
+                </div>
+                <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={() => setCompleteConfirm(null)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                    Cancel
+                  </button>
+                  <button onClick={() => confirmComplete(false)} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600">
+                    Mark Complete
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
