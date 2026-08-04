@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+export const maxDuration = 60;
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request) {
@@ -18,7 +20,7 @@ export async function POST(request) {
       : "";
 
     const response = await client.messages.create({
-      model: "claude-opus-5",
+      model: "claude-haiku-4-5",
       max_tokens: 4096,
       messages: [
         {
@@ -60,7 +62,7 @@ Rules:
 
     return Response.json({ recipes });
   } catch (err) {
-    console.error("meal-suggestions error:", err);
-    return Response.json({ error: "Failed to get suggestions" }, { status: 500 });
+    console.error("meal-suggestions error:", err.message);
+    return Response.json({ error: err.message || "Failed to get suggestions" }, { status: 500 });
   }
 }

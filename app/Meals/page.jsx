@@ -336,7 +336,7 @@ function MealsContent() {
             {aiStep === "select" && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
-                  <p className="text-sm text-gray-600 mb-3">Select pantry items to include. Claude will suggest 5 meals you can make.</p>
+                  <p className="text-sm text-gray-600 mb-3">Select pantry items to include. Meal Planner AI will suggest 5 meals you can make.</p>
                   <div className="flex gap-2 mb-3">
                     <button onClick={selectAllAi} className="text-xs px-3 py-1 border border-purple-200 text-purple-600 rounded-full hover:bg-purple-50">
                       {aiSelected.length === pantryItems.length ? "Deselect all" : "Select all"}
