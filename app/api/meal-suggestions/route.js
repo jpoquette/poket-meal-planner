@@ -33,7 +33,14 @@ Suggest ${count} meals I could make. Return ONLY a JSON array with no other text
     "name": "Meal name",
     "description": "2-3 sentence description of the dish",
     "usedIngredients": ["pantry item 1", "pantry item 2"],
-    "missingIngredients": ["item needed 1", "item needed 2"],
+    "missingIngredients": [
+      {
+        "name": "Ingredient name",
+        "quantity": 2,
+        "unit": "lbs",
+        "category": "Meat & Seafood"
+      }
+    ],
     "allIngredients": [
       { "name": "Ingredient name", "amount": "quantity and unit, e.g. 2 cups" }
     ],
@@ -46,8 +53,12 @@ Suggest ${count} meals I could make. Return ONLY a JSON array with no other text
 ]
 
 Rules:
-- usedIngredients: only items from my pantry list that this meal uses
-- missingIngredients: essentials needed that are NOT in my pantry — keep this concise
+- usedIngredients: only items from my pantry list that this meal uses (array of strings)
+- missingIngredients: essentials needed that are NOT in my pantry, as objects with:
+    name: ingredient name
+    quantity: numeric amount needed for the recipe (use null if not applicable)
+    unit: one of exactly: bags, bottles, cans, cups, dozen, fillets, gallons, items, lbs, liters, oz, packages
+    category: one of exactly: Beverages, Canned Goods, Condiments, Dairy, Deli, Frozen, Grains & Bread, Meat & Seafood, Other, Produce, Snacks, Spices
 - allIngredients: complete ingredient list for the full recipe with amounts
 - instructions: clear numbered steps, 4-8 steps
 - specialNotes: optional tips or leave as empty string`,

@@ -147,13 +147,18 @@ function MealsContent() {
   const addToShoppingList = async () => {
     if (!aiDetailRecipe || aiShoppingItems.length === 0) return;
     setAiAddingToCart(true);
-    const rows = aiShoppingItems.map((idx) => ({
-      user_id: user.id,
-      name: aiDetailRecipe.missingIngredients[idx],
-      unit: "items",
-      category: "Other",
-      purchased: false,
-    }));
+    const rows = aiShoppingItems.map((idx) => {
+      const ing = aiDetailRecipe.missingIngredients[idx];
+      const isObj = typeof ing === "object" && ing !== null;
+      return {
+        user_id: user.id,
+        name: isObj ? ing.name : ing,
+        quantity: isObj && ing.quantity ? ing.quantity : null,
+        unit: isObj && ing.unit ? ing.unit : "items",
+        category: isObj && ing.category ? ing.category : "Other",
+        purchased: false,
+      };
+    });
     await supabase.from("mp_shopping").insert(rows);
     setAiAddingToCart(false);
     setAiShoppingItems([]);
@@ -381,7 +386,7 @@ function MealsContent() {
                         <p className="text-xs text-green-600 mb-0.5">✓ Have: {recipe.usedIngredients.join(", ")}</p>
                       )}
                       {recipe.missingIngredients?.length > 0 && (
-                        <p className="text-xs text-orange-500">Need: {recipe.missingIngredients.join(", ")}</p>
+                        <p className="text-xs text-orange-500">Need: {recipe.missingIngredients.map((i) => i.name ?? i).join(", ")}</p>
                       )}
                     </div>
                   ))}
@@ -447,16 +452,29 @@ function MealsContent() {
                       <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Add to Shopping List</p>
                       <p className="text-xs text-gray-500 mb-2">Select items you need to buy:</p>
                       <ul className="space-y-1.5">
-                        {aiDetailRecipe.missingIngredients.map((ing, idx) => (
-                          <li key={idx} onClick={() => toggleShoppingItem(idx)}
-                            className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
-                              aiShoppingItems.includes(idx) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
-                            }`}>
-                            <input type="checkbox" checked={aiShoppingItems.includes(idx)} onChange={() => toggleShoppingItem(idx)}
-                              onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-green-500 flex-shrink-0" />
-                            <span className="text-sm text-gray-800">{ing}</span>
-                          </li>
-                        ))}
+                        {aiDetailRecipe.missingIngredients.map((ing, idx) => {
+                          const isObj = typeof ing === "object" && ing !== null;
+                          const name = isObj ? ing.name : ing;
+                          const detail = isObj && ing.quantity ? `${ing.quantity} ${ing.unit}` : null;
+                          const cat = isObj ? ing.category : null;
+                          return (
+                            <li key={idx} onClick={() => toggleShoppingItem(idx)}
+                              className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
+                                aiShoppingItems.includes(idx) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
+                              }`}>
+                              <input type="checkbox" checked={aiShoppingItems.includes(idx)} onChange={() => toggleShoppingItem(idx)}
+                                onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-green-500 flex-shrink-0" />
+                              <div className="flex-1">
+                                <span className="text-sm text-gray-800">{name}</span>
+                                {(detail || cat) && (
+                                  <p className="text-xs text-gray-400 mt-0.5">
+                                    {[detail, cat].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}
