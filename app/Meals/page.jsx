@@ -38,6 +38,7 @@ function MealsContent() {
   const [aiShoppingItems, setAiShoppingItems] = useState([]);
   const [aiAddingToCart, setAiAddingToCart] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const today = toDateStr(new Date());
 
@@ -219,8 +220,39 @@ function MealsContent() {
   };
 
   const handleDelete = async (id) => {
+    const meal = meals.find((m) => m.id === id);
+    const ingredientNames = (meal?.additional_ingredients || "")
+      .split("\n")
+      .map((line) => line.split(" — ")[0].trim())
+      .filter(Boolean);
+
+    if (ingredientNames.length > 0) {
+      const { data: matches } = await supabase
+        .from("mp_shopping")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .eq("purchased", false)
+        .in("name", ingredientNames);
+
+      if (matches?.length > 0) {
+        setDeleteConfirm({ mealId: id, matchedItems: matches });
+        return;
+      }
+    }
+
     await supabase.from("mp_meals").delete().eq("id", id);
     setMeals((prev) => prev.filter((m) => m.id !== id));
+    setModal(null);
+  };
+
+  const confirmDelete = async (removeShoppingItems) => {
+    const { mealId, matchedItems } = deleteConfirm;
+    if (removeShoppingItems && matchedItems?.length > 0) {
+      await supabase.from("mp_shopping").delete().in("id", matchedItems.map((i) => i.id));
+    }
+    await supabase.from("mp_meals").delete().eq("id", mealId);
+    setMeals((prev) => prev.filter((m) => m.id !== mealId));
+    setDeleteConfirm(null);
     setModal(null);
   };
 
@@ -545,6 +577,36 @@ function MealsContent() {
               </>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
+          <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxWidth: '28rem'}}>
+            <div className="px-5 pt-5 pb-3 border-b border-gray-100">
+              <h2 className="text-lg font-bold">Remove Shopping Items?</h2>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-gray-600 mb-3">
+                The following items from this meal are still on your shopping list. Would you like to remove them?
+              </p>
+              <ul className="space-y-1 mb-4">
+                {deleteConfirm.matchedItems.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <span className="text-gray-400">•</span>{item.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-2 px-5 pb-4" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+              <button onClick={() => confirmDelete(false)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                Keep Items
+              </button>
+              <button onClick={() => confirmDelete(true)} className="flex-1 py-2.5 rounded-xl text-sm bg-red-500 text-white font-medium hover:bg-red-600">
+                Remove Items
+              </button>
+            </div>
           </div>
         </div>
       )}
