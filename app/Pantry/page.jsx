@@ -18,8 +18,6 @@ function PantryContent() {
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [aiMode, setAiMode] = useState(false);
-  const [selectedForAI, setSelectedForAI] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -46,17 +44,6 @@ function PantryContent() {
     if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
     setQuickAdd("");
   };
-
-  const toggleAiMode = () => {
-    setAiMode((on) => !on);
-    setSelectedForAI([]);
-  };
-
-  const toggleSelectForAI = (id) =>
-    setSelectedForAI((sel) => sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id]);
-
-  const selectAllForAI = () =>
-    setSelectedForAI(selectedForAI.length === filtered.length ? [] : filtered.map((i) => i.id));
 
   const openAdd = () => { setForm(EMPTY_FORM); setModal("add"); };
   const openEdit = (item) => {
@@ -92,21 +79,10 @@ function PantryContent() {
     <div className="px-4 pt-6">
       <div className="flex items-center gap-3 mb-4">
         <img src="/app-icon.png" alt="POKET" className="w-12 h-12 rounded-xl shadow-sm" />
-        <div className="flex-1">
+        <div>
           <h1 className="text-2xl font-bold">Pantry</h1>
           <p className="text-sm text-gray-500">Track what you have at home</p>
         </div>
-        <button
-          onClick={toggleAiMode}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
-            aiMode
-              ? "bg-purple-100 border-purple-300 text-purple-700"
-              : "bg-white border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600"
-          }`}
-        >
-          <span>✨</span>
-          {aiMode ? "Cancel" : "AI Meals"}
-        </button>
       </div>
 
       <form onSubmit={handleQuickAdd} className="flex gap-2 mb-3">
@@ -130,60 +106,25 @@ function PantryContent() {
         </select>
       </div>
 
-      {aiMode && (
-        <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl">
-          <p className="text-xs text-purple-700 font-medium mb-2">Select items to send to AI for meal recommendations</p>
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={selectAllForAI} className="text-xs px-3 py-1 border border-purple-200 text-purple-600 rounded-full hover:bg-purple-100">
-              {selectedForAI.length === filtered.length ? "Deselect all" : "Select all"}
-            </button>
-            <span className="text-xs text-purple-500 self-center">{selectedForAI.length} selected</span>
-          </div>
-        </div>
-      )}
-
       <ul className="space-y-2 mb-4">
         {filtered.map((item) => (
-          <li key={item.id}
-            onClick={() => aiMode ? toggleSelectForAI(item.id) : openEdit(item)}
-            className={`bg-white rounded-xl p-3 flex items-center gap-3 border shadow-sm cursor-pointer transition-colors ${
-              aiMode && selectedForAI.includes(item.id)
-                ? "border-purple-300 bg-purple-50"
-                : "border-gray-100 hover:bg-gray-50 active:bg-gray-100"
-            }`}>
-            {aiMode && (
-              <input
-                type="checkbox"
-                checked={selectedForAI.includes(item.id)}
-                onChange={() => toggleSelectForAI(item.id)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-4 h-4 accent-purple-500 flex-shrink-0"
-              />
-            )}
-            <div className="flex-1">
+          <li key={item.id} onClick={() => openEdit(item)}
+            className="bg-white rounded-xl p-3 flex items-center justify-between border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors">
+            <div>
               <p className="font-semibold text-sm text-gray-900">{item.name}</p>
               <p className="text-xs text-gray-600 mt-0.5">
                 {item.quantity ? `${item.quantity} ${item.unit}` : ""}
                 {item.category && item.category !== "Other" ? ` · ${item.category}` : ""}
               </p>
             </div>
-            {!aiMode && <span className="text-gray-400 text-lg">›</span>}
+            <span className="text-gray-400 text-lg">›</span>
           </li>
         ))}
       </ul>
 
-      {aiMode ? (
-        <button
-          disabled={selectedForAI.length === 0}
-          className="w-full py-3 rounded-xl text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          ✨ Get Meal Ideas ({selectedForAI.length} item{selectedForAI.length !== 1 ? "s" : ""})
-        </button>
-      ) : (
-        <button onClick={openAdd} className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
-          + Add with details
-        </button>
-      )}
+      <button onClick={openAdd} className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">
+        + Add with details
+      </button>
 
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">

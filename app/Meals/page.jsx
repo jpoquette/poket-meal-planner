@@ -25,6 +25,11 @@ function MealsContent() {
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [aiModal, setAiModal] = useState(false);
+  const [aiSelected, setAiSelected] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiRecipes, setAiRecipes] = useState(null);
+  const [aiError, setAiError] = useState(null);
 
   const today = toDateStr(new Date());
 
@@ -84,6 +89,46 @@ function MealsContent() {
     .sort((a, b) => a.date.localeCompare(b.date) || MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type));
 
   const openAdd = () => { setForm({ ...EMPTY_FORM, date: selectedDate }); setModal("add"); };
+
+  const openAiModal = () => {
+    setAiSelected(pantryItems.map((i) => i.id));
+    setAiRecipes(null);
+    setAiError(null);
+    setAiModal(true);
+  };
+
+  const toggleAiItem = (id) =>
+    setAiSelected((sel) => sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id]);
+
+  const selectAllAi = () =>
+    setAiSelected(aiSelected.length === pantryItems.length ? [] : pantryItems.map((i) => i.id));
+
+  const getAiRecipes = async () => {
+    const chosen = pantryItems.filter((i) => aiSelected.includes(i.id));
+    if (chosen.length === 0) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/meal-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pantryItems: chosen }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = await res.json();
+      setAiRecipes(data.recipes);
+    } catch {
+      setAiError("Something went wrong. Please try again.");
+    }
+    setAiLoading(false);
+  };
+
+  const useRecipe = (recipe) => {
+    setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, notes: recipe.description || "" });
+    setAiModal(false);
+    setAiRecipes(null);
+    setModal("add");
+  };
   const openEdit = (meal) => { setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" }); setModal(meal.id); };
 
   const handleSave = async (e) => {
@@ -184,9 +229,14 @@ function MealsContent() {
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-900">{selectedDayLabel}</h2>
-          <button onClick={openAdd} className="bg-green-500 text-white text-xs px-3 py-1.5 rounded-full font-medium hover:bg-green-600 flex items-center gap-1">
-            <span>+</span> Add Meal
-          </button>
+          <div className="flex gap-2">
+            <button onClick={openAiModal} className="bg-purple-100 text-purple-700 text-xs px-3 py-1.5 rounded-full font-medium hover:bg-purple-200 flex items-center gap-1">
+              ✨ AI Ideas
+            </button>
+            <button onClick={openAdd} className="bg-green-500 text-white text-xs px-3 py-1.5 rounded-full font-medium hover:bg-green-600 flex items-center gap-1">
+              <span>+</span> Add Meal
+            </button>
+          </div>
         </div>
         {selectedMeals.length === 0 ? (
           <div className="text-center py-6">
@@ -225,6 +275,81 @@ function MealsContent() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {aiModal && (
+        <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
+          <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <h2 className="text-lg font-bold">✨ AI Meal Ideas</h2>
+              <button onClick={() => setAiModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+
+            {!aiRecipes ? (
+              <>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                  <p className="text-sm text-gray-600 mb-3">
+                    Select pantry items to include. Claude will suggest meals you can make.
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <button onClick={selectAllAi} className="text-xs px-3 py-1 border border-purple-200 text-purple-600 rounded-full hover:bg-purple-50">
+                      {aiSelected.length === pantryItems.length ? "Deselect all" : "Select all"}
+                    </button>
+                    <span className="text-xs text-gray-400 self-center">{aiSelected.length} of {pantryItems.length} selected</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {pantryItems.map((item) => (
+                      <li key={item.id}
+                        onClick={() => toggleAiItem(item.id)}
+                        className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
+                          aiSelected.includes(item.id) ? "border-purple-300 bg-purple-50" : "border-gray-100 hover:bg-gray-50"
+                        }`}>
+                        <input type="checkbox" checked={aiSelected.includes(item.id)} onChange={() => toggleAiItem(item.id)}
+                          onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-purple-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-800">{item.name}</span>
+                        {item.quantity && <span className="text-xs text-gray-400 ml-auto">{item.quantity} {item.unit}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  {aiError && <p className="mt-3 text-sm text-red-500">{aiError}</p>}
+                </div>
+                <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={getAiRecipes} disabled={aiSelected.length === 0 || aiLoading}
+                    className="w-full py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                    {aiLoading ? "Getting ideas..." : `✨ Get Meal Ideas (${aiSelected.length} items)`}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                  <p className="text-sm text-gray-500 mb-1">Tap a recipe to add it to your meal plan.</p>
+                  {aiRecipes.map((recipe, i) => (
+                    <div key={i} className="border border-gray-200 rounded-xl p-4">
+                      <p className="font-semibold text-gray-900 mb-1">{recipe.name}</p>
+                      {recipe.description && <p className="text-xs text-gray-500 mb-2">{recipe.description}</p>}
+                      {recipe.usedIngredients?.length > 0 && (
+                        <p className="text-xs text-green-600 mb-1">✓ Have: {recipe.usedIngredients.join(", ")}</p>
+                      )}
+                      {recipe.missingIngredients?.length > 0 && (
+                        <p className="text-xs text-orange-500 mb-2">Need: {recipe.missingIngredients.join(", ")}</p>
+                      )}
+                      <button onClick={() => useRecipe(recipe)}
+                        className="w-full mt-1 py-2 rounded-lg text-xs font-medium bg-green-500 text-white hover:bg-green-600">
+                        Use This Recipe
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={() => setAiRecipes(null)} className="w-full py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                    ← Back to selection
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
