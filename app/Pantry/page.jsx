@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useUser } from "../components/AuthProvider";
 import { AuthGuard } from "../components/AuthGuard";
@@ -8,8 +9,17 @@ const UNITS = ["bags", "bottles", "cans", "cups", "dozen", "fillets", "gallons",
 const CATEGORIES = ["Beverages", "Canned Goods", "Condiments", "Dairy", "Deli", "Frozen", "Grains & Bread", "Meat & Seafood", "Other", "Produce", "Snacks", "Spices"];
 const EMPTY_FORM = { name: "", quantity: "", unit: "packages", category: "Other", date_acquired: "", expiration_date: "", notes: "" };
 
+function daysUntilExpiry(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(dateStr + "T00:00:00");
+  return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+}
+
 function PantryContent() {
   const user = useUser();
+  const router = useRouter();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [quickAdd, setQuickAdd] = useState("");
@@ -18,6 +28,7 @@ function PantryContent() {
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [expiryWindow, setExpiryWindow] = useState(7);
 
   useEffect(() => {
     if (!user) return;
@@ -35,6 +46,11 @@ function PantryContent() {
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = categoryFilter === "All" || item.category === categoryFilter;
     return matchSearch && matchCat;
+  });
+
+  const expiringItems = items.filter((item) => {
+    const days = daysUntilExpiry(item.expiration_date);
+    return days !== null && days <= expiryWindow;
   });
 
   const handleQuickAdd = async (e) => {
@@ -85,6 +101,31 @@ function PantryContent() {
         </div>
       </div>
 
+      {/* Expiring soon banner */}
+      {expiringItems.length > 0 && (
+        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-orange-700">
+              🕐 {expiringItems.length} item{expiringItems.length !== 1 ? "s" : ""} expiring within {expiryWindow} days
+            </p>
+            <button
+              onClick={() => router.push(`/Meals?expiring=${expiryWindow}`)}
+              className="text-xs px-3 py-1 bg-orange-500 text-white rounded-full font-medium hover:bg-orange-600">
+              ✨ Get Meal Ideas
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-orange-600">Window:</span>
+            {[3, 7, 14].map((d) => (
+              <button key={d} onClick={() => setExpiryWindow(d)}
+                className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${expiryWindow === d ? "bg-orange-500 text-white border-orange-500" : "border-orange-300 text-orange-600 hover:bg-orange-100"}`}>
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleQuickAdd} className="flex gap-2 mb-3">
         <input className={inputCls + " flex-1"} placeholder="Quick add an item..." value={quickAdd} onChange={(e) => setQuickAdd(e.target.value)} />
         <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-600">Add</button>
@@ -107,19 +148,29 @@ function PantryContent() {
       </div>
 
       <ul className="space-y-2 mb-4">
-        {filtered.map((item) => (
-          <li key={item.id} onClick={() => openEdit(item)}
-            className="bg-white rounded-xl p-3 flex items-center justify-between border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors">
-            <div>
-              <p className="font-semibold text-sm text-gray-900">{item.name}</p>
-              <p className="text-xs text-gray-600 mt-0.5">
-                {item.quantity ? `${item.quantity} ${item.unit}` : ""}
-                {item.category && item.category !== "Other" ? ` · ${item.category}` : ""}
-              </p>
-            </div>
-            <span className="text-gray-400 text-lg">›</span>
-          </li>
-        ))}
+        {filtered.map((item) => {
+          const days = daysUntilExpiry(item.expiration_date);
+          const isExpired = days !== null && days <= 0;
+          const isExpiringSoon = days !== null && days > 0 && days <= expiryWindow;
+          return (
+            <li key={item.id} onClick={() => openEdit(item)}
+              className={`bg-white rounded-xl p-3 flex items-center justify-between border shadow-sm cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors ${isExpired ? "border-red-200" : isExpiringSoon ? "border-orange-200" : "border-gray-100"}`}>
+              <div>
+                <p className="font-semibold text-sm text-gray-900">{item.name}</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {item.quantity ? `${item.quantity} ${item.unit}` : ""}
+                  {item.category && item.category !== "Other" ? ` · ${item.category}` : ""}
+                </p>
+                {days !== null && (
+                  <p className={`text-xs mt-0.5 font-medium ${isExpired ? "text-red-500" : isExpiringSoon ? "text-orange-500" : "text-gray-400"}`}>
+                    {isExpired ? `Expired ${Math.abs(days)}d ago` : days === 0 ? "Expires today" : `Expires in ${days}d`}
+                  </p>
+                )}
+              </div>
+              <span className="text-gray-400 text-lg">›</span>
+            </li>
+          );
+        })}
       </ul>
 
       <button onClick={openAdd} className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors">

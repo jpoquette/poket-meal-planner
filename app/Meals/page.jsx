@@ -38,7 +38,8 @@ function MealsContent() {
   const [aiShoppingItems, setAiShoppingItems] = useState([]);
   const [aiAddingToCart, setAiAddingToCart] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { matchedItems: [] } when confirming
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [completeConfirm, setCompleteConfirm] = useState(null);
 
   const today = toDateStr(new Date());
 
@@ -46,13 +47,41 @@ function MealsContent() {
     if (!user) return;
     Promise.all([
       supabase.from("mp_meals").select("*").eq("user_id", user.id),
-      supabase.from("mp_pantry").select("id, name, quantity, unit").eq("user_id", user.id).order("name"),
+      supabase.from("mp_pantry").select("id, name, quantity, unit, expiration_date").eq("user_id", user.id).order("name"),
     ]).then(([{ data: m }, { data: p }]) => {
       setMeals(m || []);
       setPantryItems(p || []);
       setLoading(false);
     });
   }, [user]);
+
+  // Auto-open AI modal pre-filtered to expiring items when navigated from Pantry
+  useEffect(() => {
+    if (pantryItems.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const expiringDays = parseInt(params.get("expiring"));
+    if (isNaN(expiringDays)) return;
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const expiringIds = pantryItems
+      .filter((item) => {
+        if (!item.expiration_date) return false;
+        const expiry = new Date(item.expiration_date + "T00:00:00");
+        const days = Math.ceil((expiry - todayDate) / (1000 * 60 * 60 * 24));
+        return days <= expiringDays;
+      })
+      .map((i) => i.id);
+    if (expiringIds.length > 0) {
+      setAiSelected(expiringIds);
+      setAiRecipes([]);
+      setAiError(null);
+      setAiStep("select");
+      setAiDetailRecipe(null);
+      setAiModal(true);
+      // Remove param from URL without reloading
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [pantryItems]);
 
   const goToToday = () => {
     const now = new Date();
@@ -94,7 +123,7 @@ function MealsContent() {
   const monthLabel = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const selectedMeals = meals.filter((m) => m.date === selectedDate);
   const upcomingMeals = meals
-    .filter((m) => m.date >= today && m.date <= toDateStr(addDays(new Date(), 7)))
+    .filter((m) => m.date >= today && m.date <= toDateStr(addDays(new Date(), 7)) && !m.completed)
     .sort((a, b) => a.date.localeCompare(b.date) || MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type));
 
   const openAdd = () => { setForm({ ...EMPTY_FORM, date: selectedDate }); setModal("add"); };
@@ -123,15 +152,15 @@ function MealsContent() {
       const res = await fetch("/api/meal-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pantryItems: chosen,
-          count: 3,
-          exclude: aiRecipes.map((r) => r.name),
-        }),
+        body: JSON.stringify({ pantryItems: chosen, count: 3, exclude: aiRecipes.map((r) => r.name) }),
       });
       if (!res.ok) throw new Error("Request failed");
       const data = await res.json();
-      setAiRecipes((prev) => [...prev, ...data.recipes].slice(0, 9));
+      // Sort by pantry item usage score descending
+      const scored = [...data.recipes].sort((a, b) =>
+        (b.usedIngredients?.length || 0) - (a.usedIngredients?.length || 0)
+      );
+      setAiRecipes((prev) => [...prev, ...scored].slice(0, 9));
       setAiStep("recipes");
     } catch {
       setAiError("Something went wrong. Please try again.");
@@ -202,7 +231,11 @@ function MealsContent() {
       setAiStep("select");
     }
   };
-  const openEdit = (meal) => { setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" }); setModal(meal.id); };
+
+  const openEdit = (meal) => {
+    setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" });
+    setModal(meal.id);
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -222,24 +255,15 @@ function MealsContent() {
   const handleDelete = async (id) => {
     const meal = meals.find((m) => m.id === id);
     const ingredientNames = (meal?.additional_ingredients || "")
-      .split("\n")
-      .map((line) => line.split(" — ")[0].trim())
-      .filter(Boolean);
-
+      .split("\n").map((line) => line.split(" — ")[0].trim()).filter(Boolean);
     if (ingredientNames.length > 0) {
-      const { data: matches } = await supabase
-        .from("mp_shopping")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .eq("purchased", false)
-        .in("name", ingredientNames);
-
+      const { data: matches } = await supabase.from("mp_shopping").select("id, name")
+        .eq("user_id", user.id).eq("purchased", false).in("name", ingredientNames);
       if (matches?.length > 0) {
         setDeleteConfirm({ mealId: id, matchedItems: matches });
         return;
       }
     }
-
     await supabase.from("mp_meals").delete().eq("id", id);
     setMeals((prev) => prev.filter((m) => m.id !== id));
     setModal(null);
@@ -254,6 +278,45 @@ function MealsContent() {
     setMeals((prev) => prev.filter((m) => m.id !== mealId));
     setDeleteConfirm(null);
     setModal(null);
+  };
+
+  const handleComplete = async (meal, e) => {
+    e.stopPropagation();
+    if (meal.completed) return;
+    const ingredientNames = (meal.additional_ingredients || "")
+      .split("\n").map((line) => line.split(" — ")[0].trim()).filter(Boolean);
+    if (ingredientNames.length > 0) {
+      const { data: matches } = await supabase.from("mp_pantry").select("id, name")
+        .eq("user_id", user.id).in("name", ingredientNames);
+      if (matches?.length > 0) {
+        setCompleteConfirm({ meal, matchedItems: matches, selectedItems: matches.map((i) => i.id) });
+        return;
+      }
+    }
+    await markMealComplete(meal.id);
+  };
+
+  const markMealComplete = async (id) => {
+    await supabase.from("mp_meals").update({ completed: true }).eq("id", id);
+    setMeals((prev) => prev.map((m) => m.id === id ? { ...m, completed: true } : m));
+  };
+
+  const toggleCompleteItem = (id) =>
+    setCompleteConfirm((prev) => ({
+      ...prev,
+      selectedItems: prev.selectedItems.includes(id)
+        ? prev.selectedItems.filter((s) => s !== id)
+        : [...prev.selectedItems, id],
+    }));
+
+  const confirmComplete = async (removePantry) => {
+    const { meal, selectedItems } = completeConfirm;
+    if (removePantry && selectedItems.length > 0) {
+      await supabase.from("mp_pantry").delete().in("id", selectedItems);
+      setPantryItems((prev) => prev.filter((i) => !selectedItems.includes(i.id)));
+    }
+    await markMealComplete(meal.id);
+    setCompleteConfirm(null);
   };
 
   const filteredPantry = pantryItems.filter((p) => form.pantry_search && p.name.toLowerCase().includes(form.pantry_search.toLowerCase()));
@@ -355,10 +418,19 @@ function MealsContent() {
         ) : (
           <ul className="space-y-2">
             {selectedMeals.sort((a, b) => MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type)).map((meal) => (
-              <li key={meal.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer" onClick={() => openEdit(meal)}>
+              <li key={meal.id} className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${meal.completed ? "opacity-60" : "hover:bg-gray-50"}`}>
+                <button onClick={(e) => handleComplete(meal, e)}
+                  className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                    meal.completed ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-green-400"
+                  }`}>
+                  {meal.completed && <span className="text-xs">✓</span>}
+                </button>
                 <span className="text-xl">{mealEmoji(meal.meal_type)}</span>
-                <div className="flex-1"><p className="font-semibold text-sm text-gray-900">{meal.name}</p><p className="text-xs text-gray-400">{meal.meal_type}</p></div>
-                <span className="text-gray-300 text-xs">›</span>
+                <div className="flex-1 cursor-pointer" onClick={() => !meal.completed && openEdit(meal)}>
+                  <p className={`font-semibold text-sm ${meal.completed ? "line-through text-gray-400" : "text-gray-900"}`}>{meal.name}</p>
+                  <p className="text-xs text-gray-400">{meal.meal_type}</p>
+                </div>
+                {!meal.completed && <span className="text-gray-300 text-xs cursor-pointer" onClick={() => openEdit(meal)}>›</span>}
               </li>
             ))}
           </ul>
@@ -382,11 +454,10 @@ function MealsContent() {
         </div>
       )}
 
+      {/* AI Modal */}
       {aiModal && (
         <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
-
-            {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 {aiStep !== "select" && aiStep !== "shopping" && (
@@ -403,7 +474,6 @@ function MealsContent() {
               <button onClick={() => setAiModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
 
-            {/* Step 1: Pantry item selection */}
             {aiStep === "select" && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
@@ -438,19 +508,22 @@ function MealsContent() {
               </>
             )}
 
-            {/* Step 2: Recipe list */}
             {aiStep === "recipes" && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
-                  <p className="text-sm text-gray-500">Tap a recipe for full details.</p>
+                  <p className="text-sm text-gray-500">Sorted by best pantry match. Tap for full details.</p>
                   {aiRecipes.map((recipe, i) => (
                     <div key={i} onClick={() => openAiDetail(recipe)}
                       className="border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-purple-300 hover:bg-purple-50 transition-colors">
-                      <p className="font-semibold text-gray-900 mb-1">{recipe.name}</p>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <p className="font-semibold text-gray-900">{recipe.name}</p>
+                        {recipe.usedIngredients?.length > 0 && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0">
+                            Uses {recipe.usedIngredients.length} pantry item{recipe.usedIngredients.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500 mb-2 line-clamp-2">{recipe.description}</p>
-                      {recipe.usedIngredients?.length > 0 && (
-                        <p className="text-xs text-green-600 mb-0.5">✓ Have: {recipe.usedIngredients.join(", ")}</p>
-                      )}
                       {recipe.missingIngredients?.length > 0 && (
                         <p className="text-xs text-orange-500">Need: {recipe.missingIngredients.map((i) => i.name ?? i).join(", ")}</p>
                       )}
@@ -472,7 +545,6 @@ function MealsContent() {
               </>
             )}
 
-            {/* Step 3: Recipe detail */}
             {aiStep === "detail" && aiDetailLoading && (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -489,8 +561,6 @@ function MealsContent() {
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                   <p className="text-sm text-gray-600">{aiDetailRecipe.description}</p>
-
-                  {/* Ingredients */}
                   <div>
                     <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Ingredients</p>
                     <ul className="space-y-1">
@@ -502,8 +572,6 @@ function MealsContent() {
                       ))}
                     </ul>
                   </div>
-
-                  {/* Instructions */}
                   <div>
                     <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Instructions</p>
                     <ol className="space-y-2">
@@ -515,15 +583,12 @@ function MealsContent() {
                       ))}
                     </ol>
                   </div>
-
-                  {/* Special notes */}
                   {aiDetailRecipe.specialNotes && (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                       <p className="text-xs font-bold text-amber-700 mb-1">Tips & Notes</p>
                       <p className="text-xs text-amber-800">{aiDetailRecipe.specialNotes}</p>
                     </div>
                   )}
-
                 </div>
                 <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
                   <button onClick={() => planMeal(aiDetailRecipe)} disabled={aiSaving}
@@ -534,7 +599,6 @@ function MealsContent() {
               </>
             )}
 
-            {/* Step 4: Shopping list */}
             {aiStep === "shopping" && aiDetailRecipe && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
@@ -566,9 +630,7 @@ function MealsContent() {
                 </div>
                 <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
                   <button onClick={() => { setAiModal(false); setAiStep("select"); }}
-                    className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
-                    Skip
-                  </button>
+                    className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">Skip</button>
                   <button onClick={addToShoppingList} disabled={aiShoppingItems.length === 0 || aiAddingToCart}
                     className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-40">
                     {aiAddingToCart ? "Adding..." : `🛒 Add (${aiShoppingItems.length})`}
@@ -576,11 +638,11 @@ function MealsContent() {
                 </div>
               </>
             )}
-
           </div>
         </div>
       )}
 
+      {/* Meal edit modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
@@ -588,13 +650,10 @@ function MealsContent() {
               <h2 className="text-lg font-bold">{deleteConfirm ? "Remove Shopping Items?" : modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
               <button onClick={() => { setModal(null); setDeleteConfirm(null); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
-
             {deleteConfirm ? (
               <>
                 <div className="px-5 py-4 overflow-y-auto flex-1">
-                  <p className="text-sm text-gray-600 mb-3">
-                    The following items from this meal are still on your shopping list. Would you like to remove them?
-                  </p>
+                  <p className="text-sm text-gray-600 mb-3">The following items from this meal are still on your shopping list. Would you like to remove them?</p>
                   <ul className="space-y-1">
                     {deleteConfirm.matchedItems.map((item) => (
                       <li key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
@@ -635,6 +694,44 @@ function MealsContent() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Meal completion confirmation modal */}
+      {completeConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-[400] flex items-end sm:items-center justify-center px-4 pb-4">
+          <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
+            <div className="px-5 pt-5 pb-3 border-b border-gray-100">
+              <h2 className="text-lg font-bold">Remove from Pantry?</h2>
+            </div>
+            <div className="overflow-y-auto flex-1 px-5 py-4">
+              <p className="text-sm text-gray-600 mb-3">
+                These ingredients from <span className="font-semibold">{completeConfirm.meal.name}</span> are in your pantry. Remove the ones you used?
+              </p>
+              <ul className="space-y-1.5">
+                {completeConfirm.matchedItems.map((item) => (
+                  <li key={item.id} onClick={() => toggleCompleteItem(item.id)}
+                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
+                      completeConfirm.selectedItems.includes(item.id) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
+                    }`}>
+                    <input type="checkbox" checked={completeConfirm.selectedItems.includes(item.id)}
+                      onChange={() => toggleCompleteItem(item.id)} onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 accent-green-500 flex-shrink-0" />
+                    <span className="text-sm text-gray-800">{item.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+              <button onClick={() => confirmComplete(false)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                Keep in Pantry
+              </button>
+              <button onClick={() => confirmComplete(true)} disabled={completeConfirm.selectedItems.length === 0}
+                className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-40">
+                Remove ({completeConfirm.selectedItems.length})
+              </button>
+            </div>
           </div>
         </div>
       )}
