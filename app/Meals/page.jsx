@@ -166,7 +166,8 @@ function MealsContent() {
   };
 
   const useRecipe = (recipe) => {
-    setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, notes: recipe.description || "" });
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(recipe.name + " recipe")}`;
+    setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, notes: recipe.description || "", recipe_link: searchUrl });
     setAiModal(false);
     setAiStep("select");
     setModal("add");
