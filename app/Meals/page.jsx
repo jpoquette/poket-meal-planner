@@ -37,6 +37,7 @@ function MealsContent() {
   const [aiDetailError, setAiDetailError] = useState(null);
   const [aiShoppingItems, setAiShoppingItems] = useState([]);
   const [aiAddingToCart, setAiAddingToCart] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
 
   const today = toDateStr(new Date());
 
@@ -179,18 +180,26 @@ function MealsContent() {
     });
     await supabase.from("mp_shopping").insert(rows);
     setAiAddingToCart(false);
-    setAiShoppingItems([]);
-    alert(`${rows.length} item${rows.length !== 1 ? "s" : ""} added to your shopping list.`);
-  };
-
-  const useRecipe = (recipe) => {
-    const ingredientsList = recipe.allIngredients?.map((i) => `${i.name}${i.amount ? ` — ${i.amount}` : ""}`).join("\n") || "";
-    const instructionsList = recipe.instructions?.map((s, i) => `${i + 1}. ${s.replace(/^Step \d+:\s*/i, "")}`).join("\n") || "";
-    const notesText = [recipe.specialNotes, instructionsList].filter(Boolean).join("\n\n");
-    setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, additional_ingredients: ingredientsList, notes: notesText, recipe_link: "" });
     setAiModal(false);
     setAiStep("select");
-    setModal("add");
+  };
+
+  const planMeal = async (recipe) => {
+    setAiSaving(true);
+    const ingredientsList = recipe.allIngredients?.map((i) => `${i.name}${i.amount ? ` — ${i.amount}` : ""}`).join("\n") || "";
+    const instructionsList = recipe.instructions?.map((s, idx) => `${idx + 1}. ${s.replace(/^Step \d+:\s*/i, "")}`).join("\n") || "";
+    const notesText = [recipe.specialNotes, instructionsList].filter(Boolean).join("\n\n");
+    const payload = { user_id: user.id, name: recipe.name, date: selectedDate, meal_type: "Dinner", additional_ingredients: ingredientsList, notes: notesText, recipe_link: "", pantry_search: "" };
+    const { data } = await supabase.from("mp_meals").insert(payload).select().single();
+    if (data) setMeals((prev) => [...prev, data]);
+    setAiSaving(false);
+    if (recipe.missingIngredients?.length > 0) {
+      setAiShoppingItems(recipe.missingIngredients.map((_, i) => i));
+      setAiStep("shopping");
+    } else {
+      setAiModal(false);
+      setAiStep("select");
+    }
   };
   const openEdit = (meal) => { setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" }); setModal(meal.id); };
 
@@ -348,11 +357,15 @@ function MealsContent() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                {aiStep !== "select" && (
+                {aiStep !== "select" && aiStep !== "shopping" && (
                   <button onClick={() => setAiStep(aiStep === "detail" ? "recipes" : "select")} className="text-gray-400 hover:text-gray-600 text-lg leading-none mr-1">‹</button>
                 )}
                 <h2 className="text-lg font-bold">
-                  {aiStep === "select" ? "✨ AI Meal Ideas" : aiStep === "recipes" ? "✨ Suggestions" : aiDetailLoading ? "Loading..." : aiDetailRecipe?.name}
+                  {aiStep === "select" ? "✨ AI Meal Ideas"
+                    : aiStep === "recipes" ? "✨ Suggestions"
+                    : aiStep === "shopping" ? "Add to Shopping List"
+                    : aiDetailLoading ? "Loading..."
+                    : aiDetailRecipe?.name}
                 </h2>
               </div>
               <button onClick={() => setAiModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
@@ -479,49 +492,54 @@ function MealsContent() {
                     </div>
                   )}
 
-                  {/* Shopping list items */}
-                  {aiDetailRecipe.missingIngredients?.length > 0 && (
-                    <div>
-                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Add to Shopping List</p>
-                      <p className="text-xs text-gray-500 mb-2">Select items you need to buy:</p>
-                      <ul className="space-y-1.5">
-                        {aiDetailRecipe.missingIngredients.map((ing, idx) => {
-                          const isObj = typeof ing === "object" && ing !== null;
-                          const name = isObj ? ing.name : ing;
-                          const detail = isObj && ing.quantity ? `${ing.quantity} ${ing.unit}` : null;
-                          const cat = isObj ? ing.category : null;
-                          return (
-                            <li key={idx} onClick={() => toggleShoppingItem(idx)}
-                              className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
-                                aiShoppingItems.includes(idx) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
-                              }`}>
-                              <input type="checkbox" checked={aiShoppingItems.includes(idx)} onChange={() => toggleShoppingItem(idx)}
-                                onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-green-500 flex-shrink-0" />
-                              <div className="flex-1">
-                                <span className="text-sm text-gray-800">{name}</span>
-                                {(detail || cat) && (
-                                  <p className="text-xs text-gray-400 mt-0.5">
-                                    {[detail, cat].filter(Boolean).join(" · ")}
-                                  </p>
-                                )}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
+                </div>
+                <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={() => planMeal(aiDetailRecipe)} disabled={aiSaving}
+                    className="w-full py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">
+                    {aiSaving ? "Saving..." : "Plan This Meal"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 4: Shopping list */}
+            {aiStep === "shopping" && aiDetailRecipe && (
+              <>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                  <p className="text-sm text-gray-600 mb-1"><span className="font-semibold">{aiDetailRecipe.name}</span> has been added to your meal plan.</p>
+                  <p className="text-sm text-gray-500 mb-4">Select any items you'd like to add to your shopping list:</p>
+                  <ul className="space-y-1.5">
+                    {aiDetailRecipe.missingIngredients.map((ing, idx) => {
+                      const isObj = typeof ing === "object" && ing !== null;
+                      const name = isObj ? ing.name : ing;
+                      const detail = isObj && ing.quantity ? `${ing.quantity} ${ing.unit}` : null;
+                      const cat = isObj ? ing.category : null;
+                      return (
+                        <li key={idx} onClick={() => toggleShoppingItem(idx)}
+                          className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
+                            aiShoppingItems.includes(idx) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
+                          }`}>
+                          <input type="checkbox" checked={aiShoppingItems.includes(idx)} onChange={() => toggleShoppingItem(idx)}
+                            onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-green-500 flex-shrink-0" />
+                          <div className="flex-1">
+                            <span className="text-sm text-gray-800">{name}</span>
+                            {(detail || cat) && (
+                              <p className="text-xs text-gray-400 mt-0.5">{[detail, cat].filter(Boolean).join(" · ")}</p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
                 <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-                  {aiDetailRecipe.missingIngredients?.length > 0 && (
-                    <button onClick={addToShoppingList} disabled={aiShoppingItems.length === 0 || aiAddingToCart}
-                      className="flex-1 py-2.5 rounded-xl text-sm border border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-40">
-                      {aiAddingToCart ? "Adding..." : `🛒 Add (${aiShoppingItems.length})`}
-                    </button>
-                  )}
-                  <button onClick={() => useRecipe(aiDetailRecipe)}
-                    className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600">
-                    Plan This Meal
+                  <button onClick={() => { setAiModal(false); setAiStep("select"); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                    Skip
+                  </button>
+                  <button onClick={addToShoppingList} disabled={aiShoppingItems.length === 0 || aiAddingToCart}
+                    className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-40">
+                    {aiAddingToCart ? "Adding..." : `🛒 Add (${aiShoppingItems.length})`}
                   </button>
                 </div>
               </>
