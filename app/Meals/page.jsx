@@ -38,7 +38,7 @@ function MealsContent() {
   const [aiShoppingItems, setAiShoppingItems] = useState([]);
   const [aiAddingToCart, setAiAddingToCart] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { matchedItems: [] } when confirming
 
   const today = toDateStr(new Date());
 
@@ -235,7 +235,6 @@ function MealsContent() {
         .in("name", ingredientNames);
 
       if (matches?.length > 0) {
-        setModal(null);
         setDeleteConfirm({ mealId: id, matchedItems: matches });
         return;
       }
@@ -582,68 +581,60 @@ function MealsContent() {
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-[300] flex items-end sm:items-center justify-center px-4 pb-4">
-          <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxWidth: '28rem'}}>
-            <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-              <h2 className="text-lg font-bold">Remove Shopping Items?</h2>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-gray-600 mb-3">
-                The following items from this meal are still on your shopping list. Would you like to remove them?
-              </p>
-              <ul className="space-y-1 mb-4">
-                {deleteConfirm.matchedItems.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
-                    <span className="text-gray-400">•</span>{item.name}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex gap-2 px-5 pb-4" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-              <button onClick={() => confirmDelete(false)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
-                Keep Items
-              </button>
-              <button onClick={() => confirmDelete(true)} className="flex-1 py-2.5 rounded-xl text-sm bg-red-500 text-white font-medium hover:bg-red-600">
-                Remove Items
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-              <h2 className="text-lg font-bold">{modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
-              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              <h2 className="text-lg font-bold">{deleteConfirm ? "Remove Shopping Items?" : modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
+              <button onClick={() => { setModal(null); setDeleteConfirm(null); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
-            <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
-              <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
-                <Field label="Meal Name"><input className={inputCls} placeholder="e.g., Spaghetti Carbonara" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
-                <Field label="Date"><input className={inputCls} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
-                <Field label="Meal Type"><select className={inputCls} value={form.meal_type} onChange={(e) => setForm({ ...form, meal_type: e.target.value })}>{MEAL_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
-                <Field label="Use from Pantry">
-                  <input className={inputCls} placeholder="Search pantry..." value={form.pantry_search} onChange={(e) => setForm({ ...form, pantry_search: e.target.value })} />
-                  {form.pantry_search && (
-                    <ul className="mt-1 border border-gray-200 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
-                      {filteredPantry.length === 0
-                        ? <li className="px-3 py-2 text-xs text-gray-400">No pantry items found</li>
-                        : filteredPantry.map((p) => <li key={p.id} className="px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0">{p.name} — {p.quantity} {p.unit}</li>)}
-                    </ul>
-                  )}
-                </Field>
-                <Field label="Ingredients"><textarea className={inputCls} placeholder="Ingredients list..." rows={4} value={form.additional_ingredients} onChange={(e) => setForm({ ...form, additional_ingredients: e.target.value })} /></Field>
-                <Field label="Recipe Link (optional)"><input className={inputCls} type="url" placeholder="https://..." value={form.recipe_link} onChange={(e) => setForm({ ...form, recipe_link: e.target.value })} /></Field>
-                <Field label="Instructions & Notes"><textarea className={inputCls} placeholder="Cooking instructions or notes..." rows={5} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
-              </div>
-              <div className="flex gap-2 px-5 pt-4 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-                {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
-                <button type="button" onClick={() => setModal(null)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
-              </div>
-            </form>
+
+            {deleteConfirm ? (
+              <>
+                <div className="px-5 py-4 overflow-y-auto flex-1">
+                  <p className="text-sm text-gray-600 mb-3">
+                    The following items from this meal are still on your shopping list. Would you like to remove them?
+                  </p>
+                  <ul className="space-y-1">
+                    {deleteConfirm.matchedItems.map((item) => (
+                      <li key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
+                        <span className="text-gray-400">•</span>{item.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={() => confirmDelete(false)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">Keep Items</button>
+                  <button onClick={() => confirmDelete(true)} className="flex-1 py-2.5 rounded-xl text-sm bg-red-500 text-white font-medium hover:bg-red-600">Remove Items</button>
+                </div>
+              </>
+            ) : (
+              <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                  <Field label="Meal Name"><input className={inputCls} placeholder="e.g., Spaghetti Carbonara" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
+                  <Field label="Date"><input className={inputCls} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
+                  <Field label="Meal Type"><select className={inputCls} value={form.meal_type} onChange={(e) => setForm({ ...form, meal_type: e.target.value })}>{MEAL_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+                  <Field label="Use from Pantry">
+                    <input className={inputCls} placeholder="Search pantry..." value={form.pantry_search} onChange={(e) => setForm({ ...form, pantry_search: e.target.value })} />
+                    {form.pantry_search && (
+                      <ul className="mt-1 border border-gray-200 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
+                        {filteredPantry.length === 0
+                          ? <li className="px-3 py-2 text-xs text-gray-400">No pantry items found</li>
+                          : filteredPantry.map((p) => <li key={p.id} className="px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0">{p.name} — {p.quantity} {p.unit}</li>)}
+                      </ul>
+                    )}
+                  </Field>
+                  <Field label="Ingredients"><textarea className={inputCls} placeholder="Ingredients list..." rows={4} value={form.additional_ingredients} onChange={(e) => setForm({ ...form, additional_ingredients: e.target.value })} /></Field>
+                  <Field label="Recipe Link (optional)"><input className={inputCls} type="url" placeholder="https://..." value={form.recipe_link} onChange={(e) => setForm({ ...form, recipe_link: e.target.value })} /></Field>
+                  <Field label="Instructions & Notes"><textarea className={inputCls} placeholder="Cooking instructions or notes..." rows={5} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+                </div>
+                <div className="flex gap-2 px-5 pt-4 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
+                  <button type="button" onClick={() => { setModal(null); setDeleteConfirm(null); }} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
+                  <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
