@@ -235,6 +235,7 @@ function MealsContent() {
         .in("name", ingredientNames);
 
       if (matches?.length > 0) {
+        setModal(null);
         setDeleteConfirm({ mealId: id, matchedItems: matches });
         return;
       }
