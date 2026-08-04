@@ -33,6 +33,8 @@ function MealsContent() {
   const [aiRecipes, setAiRecipes] = useState([]);
   const [aiError, setAiError] = useState(null);
   const [aiDetailRecipe, setAiDetailRecipe] = useState(null);
+  const [aiDetailLoading, setAiDetailLoading] = useState(false);
+  const [aiDetailError, setAiDetailError] = useState(null);
   const [aiShoppingItems, setAiShoppingItems] = useState([]);
   const [aiAddingToCart, setAiAddingToCart] = useState(false);
 
@@ -135,10 +137,26 @@ function MealsContent() {
     isMore ? setAiLoadingMore(false) : setAiLoading(false);
   };
 
-  const openAiDetail = (recipe) => {
-    setAiDetailRecipe(recipe);
-    setAiShoppingItems(recipe.missingIngredients?.map((_, i) => i) ?? []);
+  const openAiDetail = async (recipe) => {
+    setAiDetailRecipe(null);
+    setAiDetailError(null);
+    setAiDetailLoading(true);
     setAiStep("detail");
+    try {
+      const chosen = pantryItems.filter((i) => aiSelected.includes(i.id));
+      const res = await fetch("/api/meal-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeName: recipe.name, pantryItems: chosen }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = await res.json();
+      setAiDetailRecipe(data.recipe);
+      setAiShoppingItems(data.recipe.missingIngredients?.map((_, i) => i) ?? []);
+    } catch {
+      setAiDetailError("Could not load recipe details. Please try again.");
+    }
+    setAiDetailLoading(false);
   };
 
   const toggleShoppingItem = (idx) =>
@@ -334,7 +352,7 @@ function MealsContent() {
                   <button onClick={() => setAiStep(aiStep === "detail" ? "recipes" : "select")} className="text-gray-400 hover:text-gray-600 text-lg leading-none mr-1">‹</button>
                 )}
                 <h2 className="text-lg font-bold">
-                  {aiStep === "select" ? "✨ AI Meal Ideas" : aiStep === "recipes" ? "✨ Suggestions" : aiDetailRecipe?.name}
+                  {aiStep === "select" ? "✨ AI Meal Ideas" : aiStep === "recipes" ? "✨ Suggestions" : aiDetailLoading ? "Loading..." : aiDetailRecipe?.name}
                 </h2>
               </div>
               <button onClick={() => setAiModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
@@ -410,7 +428,19 @@ function MealsContent() {
             )}
 
             {/* Step 3: Recipe detail */}
-            {aiStep === "detail" && aiDetailRecipe && (
+            {aiStep === "detail" && aiDetailLoading && (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-gray-500">Loading recipe details...</p>
+              </div>
+            )}
+            {aiStep === "detail" && aiDetailError && (
+              <div className="px-5 py-8 text-center">
+                <p className="text-sm text-red-500 mb-4">{aiDetailError}</p>
+                <button onClick={() => setAiStep("recipes")} className="text-sm text-purple-600 hover:text-purple-800">← Back to suggestions</button>
+              </div>
+            )}
+            {aiStep === "detail" && !aiDetailLoading && !aiDetailError && aiDetailRecipe && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                   <p className="text-sm text-gray-600">{aiDetailRecipe.description}</p>

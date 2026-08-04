@@ -6,71 +6,40 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request) {
   try {
-    const { pantryItems, exclude = [], count = 5 } = await request.json();
+    const { pantryItems, exclude = [], count = 3 } = await request.json();
     if (!pantryItems?.length) {
       return Response.json({ error: "No pantry items provided" }, { status: 400 });
     }
 
-    const itemList = pantryItems
-      .map((i) => `${i.name}${i.quantity ? ` (${i.quantity} ${i.unit})` : ""}`)
-      .join(", ");
-
+    const itemList = pantryItems.map((i) => i.name).join(", ");
     const excludeNote = exclude.length
-      ? `\n\nDo NOT suggest any of these meals (already shown): ${exclude.join(", ")}.`
+      ? `\n\nDo NOT suggest any of these (already shown): ${exclude.join(", ")}.`
       : "";
 
     const response = await client.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: `I have these items in my pantry: ${itemList}.${excludeNote}
+      max_tokens: 1024,
+      messages: [{
+        role: "user",
+        content: `I have these pantry items: ${itemList}.${excludeNote}
 
-Suggest ${count} meals I could make. Return ONLY a JSON array with no other text, using this exact shape:
+Suggest ${count} meals. Return ONLY a JSON array, no other text:
 [
   {
     "name": "Meal name",
-    "description": "2-3 sentence description of the dish",
+    "description": "One sentence description.",
     "usedIngredients": ["pantry item 1", "pantry item 2"],
-    "missingIngredients": [
-      {
-        "name": "Ingredient name",
-        "quantity": 2,
-        "unit": "lbs",
-        "category": "Meat & Seafood"
-      }
-    ],
-    "allIngredients": [
-      { "name": "Ingredient name", "amount": "quantity and unit, e.g. 2 cups" }
-    ],
-    "instructions": [
-      "Step 1: ...",
-      "Step 2: ..."
-    ],
-    "specialNotes": "Any tips, substitutions, or serving suggestions. Leave empty string if none."
+    "missingIngredients": ["item 1", "item 2"]
   }
 ]
 
-Rules:
-- usedIngredients: only items from my pantry list that this meal uses (array of strings)
-- missingIngredients: essentials needed that are NOT in my pantry, as objects with:
-    name: ingredient name
-    quantity: numeric amount needed for the recipe (use null if not applicable)
-    unit: one of exactly: bags, bottles, cans, cups, dozen, fillets, gallons, items, lbs, liters, oz, packages
-    category: one of exactly: Beverages, Canned Goods, Condiments, Dairy, Deli, Frozen, Grains & Bread, Meat & Seafood, Other, Produce, Snacks, Spices
-- allIngredients: complete ingredient list for the full recipe with amounts
-- instructions: clear numbered steps, 4-8 steps
-- specialNotes: optional tips or leave as empty string`,
-        },
-      ],
+usedIngredients: items from my pantry this meal uses.
+missingIngredients: key items needed that I don't have (names only, keep it short).`,
+      }],
     });
 
     const text = response.content[0].text.trim();
-    const start = text.indexOf("[");
-    const end = text.lastIndexOf("]") + 1;
-    const recipes = JSON.parse(text.slice(start, end));
-
+    const recipes = JSON.parse(text.slice(text.indexOf("["), text.lastIndexOf("]") + 1));
     return Response.json({ recipes });
   } catch (err) {
     console.error("meal-suggestions error:", err.message);
