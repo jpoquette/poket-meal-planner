@@ -582,7 +582,7 @@ function MealsContent() {
       )}
 
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
+        <div className="fixed inset-0 bg-black/40 z-[300] flex items-end sm:items-center justify-center px-4 pb-4">
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxWidth: '28rem'}}>
             <div className="px-5 pt-5 pb-3 border-b border-gray-100">
               <h2 className="text-lg font-bold">Remove Shopping Items?</h2>
