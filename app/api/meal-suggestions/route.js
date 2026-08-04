@@ -4,7 +4,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request) {
   try {
-    const { pantryItems } = await request.json();
+    const { pantryItems, exclude = [], count = 5 } = await request.json();
     if (!pantryItems?.length) {
       return Response.json({ error: "No pantry items provided" }, { status: 400 });
     }
@@ -13,27 +13,42 @@ export async function POST(request) {
       .map((i) => `${i.name}${i.quantity ? ` (${i.quantity} ${i.unit})` : ""}`)
       .join(", ");
 
+    const excludeNote = exclude.length
+      ? `\n\nDo NOT suggest any of these meals (already shown): ${exclude.join(", ")}.`
+      : "";
+
     const response = await client.messages.create({
       model: "claude-opus-5",
-      max_tokens: 1024,
+      max_tokens: 4096,
       messages: [
         {
           role: "user",
-          content: `I have these items in my pantry: ${itemList}.
+          content: `I have these items in my pantry: ${itemList}.${excludeNote}
 
-Suggest 3 meals I could make. Return ONLY a JSON array with no other text, in this exact shape:
+Suggest ${count} meals I could make. Return ONLY a JSON array with no other text, using this exact shape:
 [
   {
     "name": "Meal name",
-    "description": "One sentence description",
-    "usedIngredients": ["ingredient1", "ingredient2"],
-    "missingIngredients": ["ingredient3"]
+    "description": "2-3 sentence description of the dish",
+    "usedIngredients": ["pantry item 1", "pantry item 2"],
+    "missingIngredients": ["item needed 1", "item needed 2"],
+    "allIngredients": [
+      { "name": "Ingredient name", "amount": "quantity and unit, e.g. 2 cups" }
+    ],
+    "instructions": [
+      "Step 1: ...",
+      "Step 2: ..."
+    ],
+    "specialNotes": "Any tips, substitutions, or serving suggestions. Leave empty string if none."
   }
 ]
 
-usedIngredients = items from my pantry list that this meal uses.
-missingIngredients = common ingredients this meal needs that are NOT in my pantry list.
-Keep missingIngredients short — only the essentials I'd need to buy.`,
+Rules:
+- usedIngredients: only items from my pantry list that this meal uses
+- missingIngredients: essentials needed that are NOT in my pantry — keep this concise
+- allIngredients: complete ingredient list for the full recipe with amounts
+- instructions: clear numbered steps, 4-8 steps
+- specialNotes: optional tips or leave as empty string`,
         },
       ],
     });

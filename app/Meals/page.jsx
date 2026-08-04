@@ -26,10 +26,15 @@ function MealsContent() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [aiModal, setAiModal] = useState(false);
+  const [aiStep, setAiStep] = useState("select");
   const [aiSelected, setAiSelected] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiRecipes, setAiRecipes] = useState(null);
+  const [aiLoadingMore, setAiLoadingMore] = useState(false);
+  const [aiRecipes, setAiRecipes] = useState([]);
   const [aiError, setAiError] = useState(null);
+  const [aiDetailRecipe, setAiDetailRecipe] = useState(null);
+  const [aiShoppingItems, setAiShoppingItems] = useState([]);
+  const [aiAddingToCart, setAiAddingToCart] = useState(false);
 
   const today = toDateStr(new Date());
 
@@ -91,9 +96,11 @@ function MealsContent() {
   const openAdd = () => { setForm({ ...EMPTY_FORM, date: selectedDate }); setModal("add"); };
 
   const openAiModal = () => {
-    setAiSelected(pantryItems.map((i) => i.id));
-    setAiRecipes(null);
+    setAiSelected([]);
+    setAiRecipes([]);
     setAiError(null);
+    setAiStep("select");
+    setAiDetailRecipe(null);
     setAiModal(true);
   };
 
@@ -103,30 +110,60 @@ function MealsContent() {
   const selectAllAi = () =>
     setAiSelected(aiSelected.length === pantryItems.length ? [] : pantryItems.map((i) => i.id));
 
-  const getAiRecipes = async () => {
+  const fetchRecipes = async (isMore = false) => {
     const chosen = pantryItems.filter((i) => aiSelected.includes(i.id));
     if (chosen.length === 0) return;
-    setAiLoading(true);
+    isMore ? setAiLoadingMore(true) : setAiLoading(true);
     setAiError(null);
     try {
       const res = await fetch("/api/meal-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pantryItems: chosen }),
+        body: JSON.stringify({
+          pantryItems: chosen,
+          count: 5,
+          exclude: aiRecipes.map((r) => r.name),
+        }),
       });
       if (!res.ok) throw new Error("Request failed");
       const data = await res.json();
-      setAiRecipes(data.recipes);
+      setAiRecipes((prev) => [...prev, ...data.recipes].slice(0, 10));
+      setAiStep("recipes");
     } catch {
       setAiError("Something went wrong. Please try again.");
     }
-    setAiLoading(false);
+    isMore ? setAiLoadingMore(false) : setAiLoading(false);
+  };
+
+  const openAiDetail = (recipe) => {
+    setAiDetailRecipe(recipe);
+    setAiShoppingItems(recipe.missingIngredients?.map((_, i) => i) ?? []);
+    setAiStep("detail");
+  };
+
+  const toggleShoppingItem = (idx) =>
+    setAiShoppingItems((sel) => sel.includes(idx) ? sel.filter((s) => s !== idx) : [...sel, idx]);
+
+  const addToShoppingList = async () => {
+    if (!aiDetailRecipe || aiShoppingItems.length === 0) return;
+    setAiAddingToCart(true);
+    const rows = aiShoppingItems.map((idx) => ({
+      user_id: user.id,
+      name: aiDetailRecipe.missingIngredients[idx],
+      unit: "items",
+      category: "Other",
+      purchased: false,
+    }));
+    await supabase.from("mp_shopping").insert(rows);
+    setAiAddingToCart(false);
+    setAiShoppingItems([]);
+    alert(`${rows.length} item${rows.length !== 1 ? "s" : ""} added to your shopping list.`);
   };
 
   const useRecipe = (recipe) => {
     setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, notes: recipe.description || "" });
     setAiModal(false);
-    setAiRecipes(null);
+    setAiStep("select");
     setModal("add");
   };
   const openEdit = (meal) => { setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" }); setModal(meal.id); };
@@ -281,17 +318,25 @@ function MealsContent() {
       {aiModal && (
         <div className="fixed inset-0 bg-black/40 z-[200] flex items-end sm:items-center justify-center px-4 pb-4">
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
+
+            {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-              <h2 className="text-lg font-bold">✨ AI Meal Ideas</h2>
+              <div className="flex items-center gap-2">
+                {aiStep !== "select" && (
+                  <button onClick={() => setAiStep(aiStep === "detail" ? "recipes" : "select")} className="text-gray-400 hover:text-gray-600 text-lg leading-none mr-1">‹</button>
+                )}
+                <h2 className="text-lg font-bold">
+                  {aiStep === "select" ? "✨ AI Meal Ideas" : aiStep === "recipes" ? "✨ Suggestions" : aiDetailRecipe?.name}
+                </h2>
+              </div>
               <button onClick={() => setAiModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
 
-            {!aiRecipes ? (
+            {/* Step 1: Pantry item selection */}
+            {aiStep === "select" && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
-                  <p className="text-sm text-gray-600 mb-3">
-                    Select pantry items to include. Claude will suggest meals you can make.
-                  </p>
+                  <p className="text-sm text-gray-600 mb-3">Select pantry items to include. Claude will suggest 5 meals you can make.</p>
                   <div className="flex gap-2 mb-3">
                     <button onClick={selectAllAi} className="text-xs px-3 py-1 border border-purple-200 text-purple-600 rounded-full hover:bg-purple-50">
                       {aiSelected.length === pantryItems.length ? "Deselect all" : "Select all"}
@@ -300,8 +345,7 @@ function MealsContent() {
                   </div>
                   <ul className="space-y-1.5">
                     {pantryItems.map((item) => (
-                      <li key={item.id}
-                        onClick={() => toggleAiItem(item.id)}
+                      <li key={item.id} onClick={() => toggleAiItem(item.id)}
                         className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
                           aiSelected.includes(item.id) ? "border-purple-300 bg-purple-50" : "border-gray-100 hover:bg-gray-50"
                         }`}>
@@ -315,40 +359,123 @@ function MealsContent() {
                   {aiError && <p className="mt-3 text-sm text-red-500">{aiError}</p>}
                 </div>
                 <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-                  <button onClick={getAiRecipes} disabled={aiSelected.length === 0 || aiLoading}
+                  <button onClick={() => fetchRecipes(false)} disabled={aiSelected.length === 0 || aiLoading}
                     className="w-full py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed">
-                    {aiLoading ? "Getting ideas..." : `✨ Get Meal Ideas (${aiSelected.length} items)`}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
-                  <p className="text-sm text-gray-500 mb-1">Tap a recipe to add it to your meal plan.</p>
-                  {aiRecipes.map((recipe, i) => (
-                    <div key={i} className="border border-gray-200 rounded-xl p-4">
-                      <p className="font-semibold text-gray-900 mb-1">{recipe.name}</p>
-                      {recipe.description && <p className="text-xs text-gray-500 mb-2">{recipe.description}</p>}
-                      {recipe.usedIngredients?.length > 0 && (
-                        <p className="text-xs text-green-600 mb-1">✓ Have: {recipe.usedIngredients.join(", ")}</p>
-                      )}
-                      {recipe.missingIngredients?.length > 0 && (
-                        <p className="text-xs text-orange-500 mb-2">Need: {recipe.missingIngredients.join(", ")}</p>
-                      )}
-                      <button onClick={() => useRecipe(recipe)}
-                        className="w-full mt-1 py-2 rounded-lg text-xs font-medium bg-green-500 text-white hover:bg-green-600">
-                        Use This Recipe
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-                  <button onClick={() => setAiRecipes(null)} className="w-full py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
-                    ← Back to selection
+                    {aiLoading ? "Getting ideas..." : `✨ Get Meal Ideas (${aiSelected.length} item${aiSelected.length !== 1 ? "s" : ""})`}
                   </button>
                 </div>
               </>
             )}
+
+            {/* Step 2: Recipe list */}
+            {aiStep === "recipes" && (
+              <>
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                  <p className="text-sm text-gray-500">Tap a recipe for full details.</p>
+                  {aiRecipes.map((recipe, i) => (
+                    <div key={i} onClick={() => openAiDetail(recipe)}
+                      className="border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-purple-300 hover:bg-purple-50 transition-colors">
+                      <p className="font-semibold text-gray-900 mb-1">{recipe.name}</p>
+                      <p className="text-xs text-gray-500 mb-2 line-clamp-2">{recipe.description}</p>
+                      {recipe.usedIngredients?.length > 0 && (
+                        <p className="text-xs text-green-600 mb-0.5">✓ Have: {recipe.usedIngredients.join(", ")}</p>
+                      )}
+                      {recipe.missingIngredients?.length > 0 && (
+                        <p className="text-xs text-orange-500">Need: {recipe.missingIngredients.join(", ")}</p>
+                      )}
+                    </div>
+                  ))}
+                  {aiRecipes.length < 10 && (
+                    <button onClick={() => fetchRecipes(true)} disabled={aiLoadingMore}
+                      className="w-full text-sm text-purple-600 hover:text-purple-800 py-2 disabled:opacity-40">
+                      {aiLoadingMore ? "Getting more ideas..." : "✨ Generate 5 more suggestions"}
+                    </button>
+                  )}
+                  {aiError && <p className="text-sm text-red-500">{aiError}</p>}
+                </div>
+                <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <button onClick={() => setAiStep("select")} className="w-full py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                    ← Change pantry selection
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Recipe detail */}
+            {aiStep === "detail" && aiDetailRecipe && (
+              <>
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+                  <p className="text-sm text-gray-600">{aiDetailRecipe.description}</p>
+
+                  {/* Ingredients */}
+                  <div>
+                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Ingredients</p>
+                    <ul className="space-y-1">
+                      {aiDetailRecipe.allIngredients?.map((ing, i) => (
+                        <li key={i} className="text-sm text-gray-700 flex gap-2">
+                          <span className="text-gray-400">•</span>
+                          <span><span className="font-medium">{ing.name}</span>{ing.amount ? ` — ${ing.amount}` : ""}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Instructions */}
+                  <div>
+                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Instructions</p>
+                    <ol className="space-y-2">
+                      {aiDetailRecipe.instructions?.map((step, i) => (
+                        <li key={i} className="text-sm text-gray-700 flex gap-2">
+                          <span className="font-bold text-purple-600 flex-shrink-0">{i + 1}.</span>
+                          <span>{step.replace(/^Step \d+:\s*/i, "")}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  {/* Special notes */}
+                  {aiDetailRecipe.specialNotes && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-amber-700 mb-1">Tips & Notes</p>
+                      <p className="text-xs text-amber-800">{aiDetailRecipe.specialNotes}</p>
+                    </div>
+                  )}
+
+                  {/* Shopping list items */}
+                  {aiDetailRecipe.missingIngredients?.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Add to Shopping List</p>
+                      <p className="text-xs text-gray-500 mb-2">Select items you need to buy:</p>
+                      <ul className="space-y-1.5">
+                        {aiDetailRecipe.missingIngredients.map((ing, idx) => (
+                          <li key={idx} onClick={() => toggleShoppingItem(idx)}
+                            className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
+                              aiShoppingItems.includes(idx) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
+                            }`}>
+                            <input type="checkbox" checked={aiShoppingItems.includes(idx)} onChange={() => toggleShoppingItem(idx)}
+                              onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-green-500 flex-shrink-0" />
+                            <span className="text-sm text-gray-800">{ing}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  {aiDetailRecipe.missingIngredients?.length > 0 && (
+                    <button onClick={addToShoppingList} disabled={aiShoppingItems.length === 0 || aiAddingToCart}
+                      className="flex-1 py-2.5 rounded-xl text-sm border border-green-300 text-green-600 hover:bg-green-50 disabled:opacity-40">
+                      {aiAddingToCart ? "Adding..." : `🛒 Add (${aiShoppingItems.length})`}
+                    </button>
+                  )}
+                  <button onClick={() => useRecipe(aiDetailRecipe)}
+                    className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600">
+                    Plan This Meal
+                  </button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}
