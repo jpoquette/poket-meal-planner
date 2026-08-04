@@ -166,8 +166,10 @@ function MealsContent() {
   };
 
   const useRecipe = (recipe) => {
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(recipe.name + " recipe")}`;
-    setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, notes: recipe.description || "", recipe_link: searchUrl });
+    const ingredientsList = recipe.allIngredients?.map((i) => `${i.name}${i.amount ? ` — ${i.amount}` : ""}`).join("\n") || "";
+    const instructionsList = recipe.instructions?.map((s, i) => `${i + 1}. ${s.replace(/^Step \d+:\s*/i, "")}`).join("\n") || "";
+    const notesText = [recipe.specialNotes, instructionsList].filter(Boolean).join("\n\n");
+    setForm({ ...EMPTY_FORM, date: selectedDate, name: recipe.name, additional_ingredients: ingredientsList, notes: notesText, recipe_link: "" });
     setAiModal(false);
     setAiStep("select");
     setModal("add");
@@ -521,9 +523,9 @@ function MealsContent() {
                     </ul>
                   )}
                 </Field>
-                <Field label="Additional Ingredients"><textarea className={inputCls} placeholder="Any other ingredients not in pantry..." rows={2} value={form.additional_ingredients} onChange={(e) => setForm({ ...form, additional_ingredients: e.target.value })} /></Field>
+                <Field label="Ingredients"><textarea className={inputCls} placeholder="Ingredients list..." rows={4} value={form.additional_ingredients} onChange={(e) => setForm({ ...form, additional_ingredients: e.target.value })} /></Field>
                 <Field label="Recipe Link (optional)"><input className={inputCls} type="url" placeholder="https://..." value={form.recipe_link} onChange={(e) => setForm({ ...form, recipe_link: e.target.value })} /></Field>
-                <Field label="Notes"><textarea className={inputCls} placeholder="Optional notes..." rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+                <Field label="Instructions & Notes"><textarea className={inputCls} placeholder="Cooking instructions or notes..." rows={5} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
               </div>
               <div className="flex gap-2 px-5 pt-4 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
                 {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
