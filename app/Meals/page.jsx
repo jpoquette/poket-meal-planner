@@ -121,13 +121,13 @@ function MealsContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pantryItems: chosen,
-          count: 5,
+          count: 3,
           exclude: aiRecipes.map((r) => r.name),
         }),
       });
       if (!res.ok) throw new Error("Request failed");
       const data = await res.json();
-      setAiRecipes((prev) => [...prev, ...data.recipes].slice(0, 10));
+      setAiRecipes((prev) => [...prev, ...data.recipes].slice(0, 9));
       setAiStep("recipes");
     } catch {
       setAiError("Something went wrong. Please try again.");
@@ -344,7 +344,7 @@ function MealsContent() {
             {aiStep === "select" && (
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
-                  <p className="text-sm text-gray-600 mb-3">Select pantry items to include. Meal Planner AI will suggest 5 meals you can make.</p>
+                  <p className="text-sm text-gray-600 mb-3">Select pantry items to include. Meal Planner AI will suggest 3 meals you can make.</p>
                   <div className="flex gap-2 mb-3">
                     <button onClick={selectAllAi} className="text-xs px-3 py-1 border border-purple-200 text-purple-600 rounded-full hover:bg-purple-50">
                       {aiSelected.length === pantryItems.length ? "Deselect all" : "Select all"}
@@ -393,10 +393,10 @@ function MealsContent() {
                       )}
                     </div>
                   ))}
-                  {aiRecipes.length < 10 && (
+                  {aiRecipes.length < 9 && (
                     <button onClick={() => fetchRecipes(true)} disabled={aiLoadingMore}
                       className="w-full text-sm text-purple-600 hover:text-purple-800 py-2 disabled:opacity-40">
-                      {aiLoadingMore ? "Getting more ideas..." : "✨ Generate 5 more suggestions"}
+                      {aiLoadingMore ? "Getting more ideas..." : "✨ Generate 3 more suggestions"}
                     </button>
                   )}
                   {aiError && <p className="text-sm text-red-500">{aiError}</p>}
