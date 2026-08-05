@@ -207,14 +207,12 @@ function MealsContent() {
     if (!aiDetailRecipe || aiShoppingItems.length === 0) return;
     setAiAddingToCart(true);
     const rows = aiShoppingItems.map((idx) => {
-      const ing = aiDetailRecipe.missingIngredients[idx];
-      const isObj = typeof ing === "object" && ing !== null;
+      const ing = aiDetailRecipe.allIngredients[idx];
       return {
         user_id: user.id,
-        name: isObj ? ing.name : ing,
-        quantity: isObj && ing.quantity ? ing.quantity : null,
-        unit: isObj && ing.unit ? ing.unit : "items",
-        category: isObj && ing.category ? ing.category : "Other",
+        name: ing.name,
+        unit: "items",
+        category: "Other",
         purchased: false,
       };
     });
@@ -233,8 +231,13 @@ function MealsContent() {
     const { data } = await supabase.from("mp_meals").insert(payload).select().single();
     if (data) setMeals((prev) => [...prev, data]);
     setAiSaving(false);
-    if (recipe.missingIngredients?.length > 0) {
-      setAiShoppingItems(recipe.missingIngredients.map((_, i) => i));
+    if (recipe.allIngredients?.length > 0) {
+      const pantryNames = new Set(pantryItems.map((p) => p.name.toLowerCase().trim()));
+      const preSelected = recipe.allIngredients
+        .map((ing, i) => ({ ing, i }))
+        .filter(({ ing }) => !pantryNames.has(ing.name.toLowerCase().trim()))
+        .map(({ i }) => i);
+      setAiShoppingItems(preSelected);
       setAiStep("shopping");
     } else {
       setAiModal(false);
@@ -673,26 +676,27 @@ function MealsContent() {
               <>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
                   <p className="text-sm text-gray-600 mb-1"><span className="font-semibold">{aiDetailRecipe.name}</span> has been added to your meal plan.</p>
-                  <p className="text-sm text-gray-500 mb-4">Select any items you'd like to add to your shopping list:</p>
+                  <p className="text-sm text-gray-500 mb-4">Select items to add to your shopping list:</p>
                   <ul className="space-y-1.5">
-                    {aiDetailRecipe.missingIngredients.map((ing, idx) => {
-                      const isObj = typeof ing === "object" && ing !== null;
-                      const name = isObj ? ing.name : ing;
-                      const detail = isObj && ing.quantity ? `${ing.quantity} ${ing.unit}` : null;
-                      const cat = isObj ? ing.category : null;
+                    {aiDetailRecipe.allIngredients?.map((ing, idx) => {
+                      const inPantry = pantryItems.some((p) => p.name.toLowerCase().trim() === ing.name.toLowerCase().trim());
+                      const checked = aiShoppingItems.includes(idx);
                       return (
                         <li key={idx} onClick={() => toggleShoppingItem(idx)}
                           className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer border transition-colors ${
-                            aiShoppingItems.includes(idx) ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
+                            checked ? "border-green-300 bg-green-50" : "border-gray-100 hover:bg-gray-50"
                           }`}>
-                          <input type="checkbox" checked={aiShoppingItems.includes(idx)} onChange={() => toggleShoppingItem(idx)}
+                          <input type="checkbox" checked={checked} onChange={() => toggleShoppingItem(idx)}
                             onClick={(e) => e.stopPropagation()} className="w-4 h-4 accent-green-500 flex-shrink-0" />
-                          <div className="flex-1">
-                            <span className="text-sm text-gray-800">{name}</span>
-                            {(detail || cat) && (
-                              <p className="text-xs text-gray-400 mt-0.5">{[detail, cat].filter(Boolean).join(" · ")}</p>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-gray-800">{ing.name}</span>
+                            {ing.amount && <span className="text-xs text-gray-400 ml-1.5">{ing.amount}</span>}
                           </div>
+                          {inPantry && (
+                            <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              In pantry
+                            </span>
+                          )}
                         </li>
                       );
                     })}

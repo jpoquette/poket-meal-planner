@@ -56,8 +56,15 @@ function PantryContent() {
   const handleQuickAdd = async (e) => {
     e.preventDefault();
     if (!quickAdd.trim()) return;
-    const { data } = await supabase.from("mp_pantry").insert({ user_id: user.id, name: quickAdd.trim(), quantity: 1, unit: "items", category: "Other" }).select().single();
-    if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    const existing = items.find((i) => i.name.toLowerCase().trim() === quickAdd.trim().toLowerCase());
+    if (existing) {
+      const newQty = (existing.quantity || 0) + 1;
+      const { data } = await supabase.from("mp_pantry").update({ quantity: newQty }).eq("id", existing.id).select().single();
+      if (data) setItems((prev) => prev.map((i) => i.id === existing.id ? data : i));
+    } else {
+      const { data } = await supabase.from("mp_pantry").insert({ user_id: user.id, name: quickAdd.trim(), quantity: 1, unit: "items", category: "Other" }).select().single();
+      if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    }
     setQuickAdd("");
   };
 
@@ -73,6 +80,16 @@ function PantryContent() {
     setSaving(true);
     const payload = { ...form, quantity: form.quantity === "" ? null : Number(form.quantity), date_acquired: form.date_acquired || null, expiration_date: form.expiration_date || null };
     if (modal === "add") {
+      const existing = items.find((i) => i.name.toLowerCase().trim() === (form.name || "").trim().toLowerCase());
+      if (existing) {
+        const newQty = (existing.quantity || 0) + (Number(form.quantity) || 1);
+        const merged = { ...payload, quantity: newQty };
+        const { data } = await supabase.from("mp_pantry").update(merged).eq("id", existing.id).select().single();
+        if (data) setItems((prev) => prev.map((i) => i.id === existing.id ? data : i).sort((a, b) => a.name.localeCompare(b.name)));
+        setSaving(false);
+        setModal(null);
+        return;
+      }
       const { data } = await supabase.from("mp_pantry").insert({ ...payload, user_id: user.id }).select().single();
       if (data) setItems((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
     } else {
