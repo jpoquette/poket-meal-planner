@@ -90,7 +90,8 @@ function ShoppingContent() {
   const moveToPantry = async () => {
     const toMove = items.filter((i) => selectedPurchased.includes(i.id));
     await Promise.all(toMove.map(async (item) => {
-      const { data: found } = await supabase.from("mp_pantry").select("id, quantity").eq("user_id", user.id).ilike("name", item.name.trim()).maybeSingle();
+      const { data: matches } = await supabase.from("mp_pantry").select("id, quantity").eq("user_id", user.id).ilike("name", item.name.trim()).limit(1);
+      const found = matches?.[0];
       if (found) {
         await supabase.from("mp_pantry").update({ quantity: (found.quantity || 0) + (item.quantity || 1) }).eq("id", found.id);
       } else {
