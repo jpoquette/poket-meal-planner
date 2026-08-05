@@ -43,6 +43,8 @@ function MealsContent() {
   const [aiSavingToRecipes, setAiSavingToRecipes] = useState(false);
   const [aiSavedToRecipes, setAiSavedToRecipes] = useState(false);
   const [mealSavedToRecipes, setMealSavedToRecipes] = useState(false);
+  const [pantryQuery, setPantryQuery] = useState("");
+  const [selectedPantryItems, setSelectedPantryItems] = useState([]);
 
   const today = toDateStr(new Date());
 
@@ -129,7 +131,12 @@ function MealsContent() {
     .filter((m) => m.date >= today && m.date <= toDateStr(addDays(new Date(), 7)) && !m.completed)
     .sort((a, b) => a.date.localeCompare(b.date) || MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type));
 
-  const openAdd = () => { setForm({ ...EMPTY_FORM, date: selectedDate }); setModal("add"); };
+  const openAdd = () => {
+    setForm({ ...EMPTY_FORM, date: selectedDate });
+    setPantryQuery("");
+    setSelectedPantryItems([]);
+    setModal("add");
+  };
 
   const openAiModal = () => {
     setAiSelected([]);
@@ -237,6 +244,9 @@ function MealsContent() {
 
   const openEdit = (meal) => {
     setForm({ name: meal.name, date: meal.date, meal_type: meal.meal_type || "Dinner", pantry_search: meal.pantry_search || "", additional_ingredients: meal.additional_ingredients || "", recipe_link: meal.recipe_link || "", notes: meal.notes || "" });
+    const savedNames = (meal.pantry_search || "").split(",").map((n) => n.trim()).filter(Boolean);
+    setSelectedPantryItems(pantryItems.filter((p) => savedNames.includes(p.name)));
+    setPantryQuery("");
     setModal(meal.id);
   };
 
@@ -244,11 +254,12 @@ function MealsContent() {
     e.preventDefault();
     if (!form.name.trim()) return;
     setSaving(true);
+    const payload = { ...form, pantry_search: selectedPantryItems.map((i) => i.name).join(", ") };
     if (modal === "add") {
-      const { data } = await supabase.from("mp_meals").insert({ ...form, user_id: user.id }).select().single();
+      const { data } = await supabase.from("mp_meals").insert({ ...payload, user_id: user.id }).select().single();
       if (data) setMeals((prev) => [...prev, data]);
     } else {
-      const { data } = await supabase.from("mp_meals").update(form).eq("id", modal).select().single();
+      const { data } = await supabase.from("mp_meals").update(payload).eq("id", modal).select().single();
       if (data) setMeals((prev) => prev.map((m) => m.id === modal ? data : m));
     }
     setSaving(false);
@@ -357,7 +368,11 @@ function MealsContent() {
     });
   };
 
-  const filteredPantry = pantryItems.filter((p) => form.pantry_search && p.name.toLowerCase().includes(form.pantry_search.toLowerCase()));
+  const filteredPantry = pantryItems.filter((p) =>
+    pantryQuery &&
+    p.name.toLowerCase().includes(pantryQuery.toLowerCase()) &&
+    !selectedPantryItems.find((s) => s.id === p.id)
+  );
   const selectedDayLabel = new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   if (loading) return <div className="flex justify-center pt-20"><div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -696,7 +711,7 @@ function MealsContent() {
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <h2 className="text-lg font-bold">{deleteConfirm ? "Remove Shopping Items?" : modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
-              <button onClick={() => { setModal(null); setDeleteConfirm(null); setMealSavedToRecipes(false); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              <button onClick={() => { setModal(null); setDeleteConfirm(null); setMealSavedToRecipes(false); setPantryQuery(""); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
             {deleteConfirm ? (
               <>
@@ -722,12 +737,31 @@ function MealsContent() {
                   <Field label="Date"><input className={inputCls} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required /></Field>
                   <Field label="Meal Type"><select className={inputCls} value={form.meal_type} onChange={(e) => setForm({ ...form, meal_type: e.target.value })}>{MEAL_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
                   <Field label="Use from Pantry">
-                    <input className={inputCls} placeholder="Search pantry..." value={form.pantry_search} onChange={(e) => setForm({ ...form, pantry_search: e.target.value })} />
-                    {form.pantry_search && (
-                      <ul className="mt-1 border border-gray-200 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
+                    {selectedPantryItems.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {selectedPantryItems.map((item) => (
+                          <span key={item.id} className="flex items-center gap-1 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                            {item.name}
+                            <button type="button" onClick={() => setSelectedPantryItems((prev) => prev.filter((p) => p.id !== item.id))}
+                              className="text-green-600 hover:text-green-900 leading-none ml-0.5">✕</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input className={inputCls} placeholder="Search pantry to add items..." value={pantryQuery}
+                      onChange={(e) => setPantryQuery(e.target.value)} />
+                    {pantryQuery && (
+                      <ul className="mt-1 border border-gray-200 rounded-xl overflow-hidden max-h-40 overflow-y-auto shadow-sm">
                         {filteredPantry.length === 0
-                          ? <li className="px-3 py-2 text-xs text-gray-400">No pantry items found</li>
-                          : filteredPantry.map((p) => <li key={p.id} className="px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0">{p.name} — {p.quantity} {p.unit}</li>)}
+                          ? <li className="px-3 py-2 text-xs text-gray-400">No matching pantry items</li>
+                          : filteredPantry.map((p) => (
+                            <li key={p.id}
+                              onMouseDown={(e) => { e.preventDefault(); setSelectedPantryItems((prev) => [...prev, p]); setPantryQuery(""); }}
+                              className="px-3 py-2 text-xs text-gray-700 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-0 flex justify-between items-center">
+                              <span className="font-medium">{p.name}</span>
+                              <span className="text-gray-400">{p.quantity} {p.unit}</span>
+                            </li>
+                          ))}
                       </ul>
                     )}
                   </Field>
@@ -738,7 +772,7 @@ function MealsContent() {
                 <div className="px-5 pt-4 pb-4 border-t border-gray-100 space-y-2" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
                   <div className="flex gap-2">
                     {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
-                    <button type="button" onClick={() => { setModal(null); setDeleteConfirm(null); setMealSavedToRecipes(false); }} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
+                    <button type="button" onClick={() => { setModal(null); setDeleteConfirm(null); setMealSavedToRecipes(false); setPantryQuery(""); }} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
                     <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
                   </div>
                   {modal !== "add" && (
