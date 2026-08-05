@@ -9,6 +9,15 @@ const EMPTY_FORM = { name: "", date: "", meal_type: "Dinner", pantry_search: "",
 const VIEWS = ["1 Week", "2 Weeks", "Month"];
 
 function toDateStr(date) { return date.toISOString().split("T")[0]; }
+function ingredientInPantry(ingName, pantryItems) {
+  const haystack = ingName.toLowerCase();
+  return pantryItems.some((p) => {
+    const pn = p.name.toLowerCase().trim();
+    if (pn.length < 3) return pn === haystack;
+    const escaped = pn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${escaped}\\b`, "i").test(haystack);
+  });
+}
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 function startOfWeek(date) { const d = new Date(date); d.setDate(d.getDate() - d.getDay()); return d; }
 function startOfMonth(date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
@@ -232,10 +241,9 @@ function MealsContent() {
     if (data) setMeals((prev) => [...prev, data]);
     setAiSaving(false);
     if (recipe.allIngredients?.length > 0) {
-      const pantryNames = new Set(pantryItems.map((p) => p.name.toLowerCase().trim()));
       const preSelected = recipe.allIngredients
         .map((ing, i) => ({ ing, i }))
-        .filter(({ ing }) => !pantryNames.has(ing.name.toLowerCase().trim()))
+        .filter(({ ing }) => !ingredientInPantry(ing.name, pantryItems))
         .map(({ i }) => i);
       setAiShoppingItems(preSelected);
       setAiStep("shopping");
@@ -679,7 +687,7 @@ function MealsContent() {
                   <p className="text-sm text-gray-500 mb-4">Select items to add to your shopping list:</p>
                   <ul className="space-y-1.5">
                     {aiDetailRecipe.allIngredients?.map((ing, idx) => {
-                      const inPantry = pantryItems.some((p) => p.name.toLowerCase().trim() === ing.name.toLowerCase().trim());
+                      const inPantry = ingredientInPantry(ing.name, pantryItems);
                       const checked = aiShoppingItems.includes(idx);
                       return (
                         <li key={idx} onClick={() => toggleShoppingItem(idx)}
