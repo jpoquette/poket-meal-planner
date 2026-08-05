@@ -89,11 +89,15 @@ function ShoppingContent() {
 
   const moveToPantry = async () => {
     const toMove = items.filter((i) => selectedPurchased.includes(i.id));
-    const pantryRows = toMove.map((i) => ({ user_id: user.id, name: i.name, quantity: i.quantity || 1, unit: i.unit || "items", category: i.category || "Other", date_acquired: new Date().toISOString().split("T")[0] }));
-    await Promise.all([
-      supabase.from("mp_pantry").insert(pantryRows),
-      supabase.from("mp_shopping").delete().in("id", selectedPurchased),
-    ]);
+    await Promise.all(toMove.map(async (item) => {
+      const { data: found } = await supabase.from("mp_pantry").select("id, quantity").eq("user_id", user.id).ilike("name", item.name.trim()).maybeSingle();
+      if (found) {
+        await supabase.from("mp_pantry").update({ quantity: (found.quantity || 0) + (item.quantity || 1) }).eq("id", found.id);
+      } else {
+        await supabase.from("mp_pantry").insert({ user_id: user.id, name: item.name, quantity: item.quantity || 1, unit: item.unit || "items", category: item.category || "Other", date_acquired: new Date().toISOString().split("T")[0] });
+      }
+    }));
+    await supabase.from("mp_shopping").delete().in("id", selectedPurchased);
     setItems((prev) => prev.filter((i) => !selectedPurchased.includes(i.id)));
     setSelectedPurchased([]);
   };
