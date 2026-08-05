@@ -299,10 +299,13 @@ function MealsContent() {
     if (meal.completed) return;
     const ingredientNames = (meal.additional_ingredients || "")
       .split("\n").map((line) => line.split(" — ")[0].trim()).filter(Boolean);
+    const pantrySearchNames = (meal.pantry_search || "")
+      .split(",").map((n) => n.trim()).filter(Boolean);
+    const allNames = [...new Set([...ingredientNames, ...pantrySearchNames])];
     let matches = [];
-    if (ingredientNames.length > 0) {
+    if (allNames.length > 0) {
       const { data } = await supabase.from("mp_pantry").select("id, name")
-        .eq("user_id", user.id).in("name", ingredientNames);
+        .eq("user_id", user.id).in("name", allNames);
       matches = data || [];
     }
     setCompleteConfirm({ meal, matchedItems: matches, selectedItems: matches.map((i) => i.id) });
