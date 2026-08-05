@@ -40,6 +40,9 @@ function MealsContent() {
   const [aiSaving, setAiSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [completeConfirm, setCompleteConfirm] = useState(null);
+  const [aiSavingToRecipes, setAiSavingToRecipes] = useState(false);
+  const [aiSavedToRecipes, setAiSavedToRecipes] = useState(false);
+  const [mealSavedToRecipes, setMealSavedToRecipes] = useState(false);
 
   const today = toDateStr(new Date());
 
@@ -317,6 +320,43 @@ function MealsContent() {
     setCompleteConfirm(null);
   };
 
+  const saveAiToRecipes = async () => {
+    if (!aiDetailRecipe) return;
+    setAiSavingToRecipes(true);
+    const ingredientsList = aiDetailRecipe.allIngredients?.map((i) =>
+      `${i.amount ? i.amount + " " : ""}${i.name}`
+    ).join("\n") || "";
+    const instructionsList = aiDetailRecipe.instructions?.map((s) =>
+      s.replace(/^Step \d+:\s*/i, "")
+    ).join("\n") || "";
+    await supabase.from("mp_recipes").insert({
+      user_id: user.id,
+      title: aiDetailRecipe.name,
+      description: aiDetailRecipe.description || "",
+      ingredients: ingredientsList,
+      instructions: instructionsList,
+      notes: aiDetailRecipe.specialNotes || "",
+      servings: "", prep_hours: 0, prep_minutes: 0, cook_hours: 0, cook_minutes: 0,
+    });
+    setAiSavingToRecipes(false);
+    setAiSavedToRecipes(true);
+  };
+
+  const saveMealToRecipes = async () => {
+    const meal = meals.find((m) => m.id === modal);
+    if (!meal) return;
+    setMealSavedToRecipes(true);
+    await supabase.from("mp_recipes").insert({
+      user_id: user.id,
+      title: meal.name,
+      description: "",
+      ingredients: meal.additional_ingredients || "",
+      instructions: meal.notes || "",
+      notes: "",
+      servings: "", prep_hours: 0, prep_minutes: 0, cook_hours: 0, cook_minutes: 0,
+    });
+  };
+
   const filteredPantry = pantryItems.filter((p) => form.pantry_search && p.name.toLowerCase().includes(form.pantry_search.toLowerCase()));
   const selectedDayLabel = new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
@@ -588,11 +628,21 @@ function MealsContent() {
                     </div>
                   )}
                 </div>
-                <div className="px-5 pt-3 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                <div className="px-5 pt-3 pb-4 border-t border-gray-100 space-y-2" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
                   <button onClick={() => planMeal(aiDetailRecipe)} disabled={aiSaving}
                     className="w-full py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">
                     {aiSaving ? "Saving..." : "Plan This Meal"}
                   </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setAiStep("recipes"); setAiSavedToRecipes(false); }}
+                      className="flex-1 py-2 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
+                      ← Back to Ideas
+                    </button>
+                    <button onClick={saveAiToRecipes} disabled={aiSavingToRecipes || aiSavedToRecipes}
+                      className="flex-1 py-2 rounded-xl text-sm border border-purple-200 text-purple-600 hover:bg-purple-50 disabled:opacity-50">
+                      {aiSavedToRecipes ? "✓ Saved!" : aiSavingToRecipes ? "Saving..." : "💾 Save to Recipes"}
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -646,7 +696,7 @@ function MealsContent() {
           <div className="bg-white rounded-2xl w-full flex flex-col" style={{maxHeight: '85dvh', maxWidth: '28rem'}}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <h2 className="text-lg font-bold">{deleteConfirm ? "Remove Shopping Items?" : modal === "add" ? "Plan a Meal" : "Edit Meal"}</h2>
-              <button onClick={() => { setModal(null); setDeleteConfirm(null); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              <button onClick={() => { setModal(null); setDeleteConfirm(null); setMealSavedToRecipes(false); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
             {deleteConfirm ? (
               <>
@@ -685,10 +735,18 @@ function MealsContent() {
                   <Field label="Recipe Link (optional)"><input className={inputCls} type="url" placeholder="https://..." value={form.recipe_link} onChange={(e) => setForm({ ...form, recipe_link: e.target.value })} /></Field>
                   <Field label="Instructions & Notes"><textarea className={inputCls} placeholder="Cooking instructions or notes..." rows={5} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
                 </div>
-                <div className="flex gap-2 px-5 pt-4 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-                  {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
-                  <button type="button" onClick={() => { setModal(null); setDeleteConfirm(null); }} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
-                  <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+                <div className="px-5 pt-4 pb-4 border-t border-gray-100 space-y-2" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                  <div className="flex gap-2">
+                    {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
+                    <button type="button" onClick={() => { setModal(null); setDeleteConfirm(null); setMealSavedToRecipes(false); }} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+                  </div>
+                  {modal !== "add" && (
+                    <button type="button" onClick={saveMealToRecipes} disabled={mealSavedToRecipes}
+                      className="w-full py-2 rounded-xl text-sm border border-purple-200 text-purple-600 hover:bg-purple-50 disabled:opacity-50">
+                      {mealSavedToRecipes ? "✓ Saved to Recipes!" : "💾 Save to Recipes"}
+                    </button>
+                  )}
                 </div>
               </form>
             )}
