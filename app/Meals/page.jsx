@@ -294,17 +294,23 @@ function MealsContent() {
     setModal(null);
   };
 
-  const handleComplete = (meal, e) => {
+  const handleComplete = async (meal, e) => {
     e.stopPropagation();
     if (meal.completed) return;
-    const ingredientNames = (meal.additional_ingredients || "")
+    // Fetch fresh from DB to avoid any stale-state or missing-column issues
+    const [{ data: freshMeal }, { data: freshPantry }] = await Promise.all([
+      supabase.from("mp_meals").select("pantry_search, additional_ingredients").eq("id", meal.id).single(),
+      supabase.from("mp_pantry").select("id, name").eq("user_id", user.id),
+    ]);
+    const src = freshMeal || meal;
+    const ingredientNames = (src.additional_ingredients || "")
       .split("\n").map((line) => line.split(" — ")[0].trim()).filter(Boolean);
-    const pantrySearchNames = (meal.pantry_search || "")
+    const pantrySearchNames = (src.pantry_search || "")
       .split(",").map((n) => n.trim()).filter(Boolean);
     const allNames = [...new Set([...ingredientNames, ...pantrySearchNames])]
-      .map((n) => n.toLowerCase());
-    const matches = pantryItems.filter((p) =>
-      allNames.includes(p.name.toLowerCase())
+      .map((n) => n.toLowerCase().trim());
+    const matches = (freshPantry || []).filter((p) =>
+      allNames.includes(p.name.toLowerCase().trim())
     );
     setCompleteConfirm({ meal, matchedItems: matches, selectedItems: matches.map((i) => i.id) });
   };
