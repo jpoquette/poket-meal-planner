@@ -164,13 +164,16 @@ function RecipesContent() {
   const getPantryMatches = () => {
     if (!selectedRecipe?.ingredients) return { have: [], missing: [] };
     const lines = selectedRecipe.ingredients.split("\n").map((l) => l.trim()).filter(Boolean);
-    const pantryNames = pantryItems.map((p) => p.name.toLowerCase());
     const have = [], missing = [];
     lines.forEach((line) => {
-      const words = line.toLowerCase().replace(/^[\d\s\/.½¼¾⅓⅔]+/, "").split(/\s+/).filter(Boolean);
-      const matched = pantryNames.some((pn) =>
-        words.some((w) => w.length > 2 && (pn.includes(w) || w.includes(pn)))
-      );
+      const lineLower = line.toLowerCase();
+      const matched = pantryItems.some((p) => {
+        const pn = p.name.toLowerCase().trim();
+        if (pn.length < 4) return false;
+        // Match the full pantry name as whole words within the ingredient line
+        const escaped = pn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`\\b${escaped}\\b`, "i").test(lineLower);
+      });
       matched ? have.push(line) : missing.push(line);
     });
     return { have, missing };
