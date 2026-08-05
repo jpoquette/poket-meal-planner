@@ -37,6 +37,9 @@ function RecipesContent() {
   const [importError, setImportError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [pantryModal, setPantryModal] = useState(false);
+  const [selectedMissing, setSelectedMissing] = useState([]);
+  const [addingToShopping, setAddingToShopping] = useState(false);
+  const [shoppingAdded, setShoppingAdded] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [planSuccess, setPlanSuccess] = useState(false);
@@ -144,6 +147,22 @@ function RecipesContent() {
     setView("list");
   };
 
+  const addToShoppingList = async () => {
+    if (selectedMissing.length === 0) return;
+    setAddingToShopping(true);
+    const rows = selectedMissing.map((name) => ({
+      user_id: user.id,
+      name: name.trim(),
+      unit: "items",
+      category: "Other",
+      purchased: false,
+    }));
+    await supabase.from("mp_shopping").insert(rows);
+    setAddingToShopping(false);
+    setShoppingAdded(true);
+    setSelectedMissing([]);
+  };
+
   const handlePlanMeal = async () => {
     setPlanning(true);
     await supabase.from("mp_meals").insert({
@@ -240,7 +259,7 @@ function RecipesContent() {
               className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-60">
               {planSuccess ? "✓ Added to Meals!" : planning ? "Adding..." : "📅 Plan This Meal"}
             </button>
-            <button onClick={() => setPantryModal(true)}
+            <button onClick={() => { setPantryModal(true); setSelectedMissing([]); setShoppingAdded(false); }}
               className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium">
               🥫 Check Pantry
             </button>
@@ -307,11 +326,29 @@ function RecipesContent() {
                   )}
                   {missing.length > 0 && (
                     <div>
-                      <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-2">✗ Need to buy ({missing.length})</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-orange-600 uppercase tracking-wider">✗ Need to buy ({missing.length})</p>
+                        <button
+                          onClick={() => setSelectedMissing(selectedMissing.length === missing.length ? [] : [...missing])}
+                          className="text-xs text-orange-500 font-medium"
+                        >
+                          {selectedMissing.length === missing.length ? "Deselect all" : "Select all"}
+                        </button>
+                      </div>
                       <ul className="space-y-1.5">
                         {missing.map((item, i) => (
-                          <li key={i} className="text-sm text-gray-700 flex gap-2">
-                            <span className="text-orange-400 flex-shrink-0">•</span>{item}
+                          <li key={i}
+                            className="text-sm text-gray-700 flex gap-2 items-start cursor-pointer"
+                            onClick={() => setSelectedMissing((prev) =>
+                              prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]
+                            )}
+                          >
+                            <span className={`w-4 h-4 mt-0.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                              selectedMissing.includes(item) ? "bg-orange-500 border-orange-500" : "border-gray-300"
+                            }`}>
+                              {selectedMissing.includes(item) && <span className="text-white text-[10px] font-bold leading-none">✓</span>}
+                            </span>
+                            {item}
                           </li>
                         ))}
                       </ul>
@@ -321,7 +358,24 @@ function RecipesContent() {
                     <p className="text-sm text-gray-500 text-center py-4">No ingredients listed for this recipe.</p>
                   )}
                 </div>
-                <div className="px-5 pb-4 pt-3 border-t border-gray-100" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+                <div className="px-5 pb-4 pt-3 border-t border-gray-100 space-y-2" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+                  {shoppingAdded ? (
+                    <div className="w-full py-2.5 rounded-xl text-sm bg-green-50 text-green-700 font-medium text-center">
+                      ✓ Added to shopping list!
+                    </div>
+                  ) : (
+                    <button
+                      onClick={addToShoppingList}
+                      disabled={selectedMissing.length === 0 || addingToShopping}
+                      className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                        selectedMissing.length > 0
+                          ? "bg-orange-500 text-white hover:bg-orange-600"
+                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      {addingToShopping ? "Adding…" : `🛒 Add ${selectedMissing.length > 0 ? selectedMissing.length : ""} to Shopping List`}
+                    </button>
+                  )}
                   <button onClick={() => setPantryModal(false)} className="w-full py-2.5 rounded-xl text-sm border border-gray-200 text-gray-600 hover:bg-gray-50">
                     Close
                   </button>
