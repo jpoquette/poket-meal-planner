@@ -10,6 +10,7 @@ function HomeContent() {
   const [pantryCount, setPantryCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
   const [shoppingCount, setShoppingCount] = useState(0);
+  const [recipesCount, setRecipesCount] = useState(0);
   const [todaysMeals, setTodaysMeals] = useState([]);
 
   const today = new Date();
@@ -22,16 +23,18 @@ function HomeContent() {
   useEffect(() => {
     if (!user) return;
     async function load() {
-      const [{ count: pCount }, { count: expCount }, { count: sCount }, { data: meals }] = await Promise.all([
+      const [{ count: pCount }, { count: expCount }, { count: sCount }, { data: meals }, { count: rCount }] = await Promise.all([
         supabase.from("mp_pantry").select("*", { count: "exact", head: true }).eq("user_id", user.id),
         supabase.from("mp_pantry").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("expiration_date", todayStr).lte("expiration_date", in7daysStr),
         supabase.from("mp_shopping").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("purchased", false),
         supabase.from("mp_meals").select("*").eq("user_id", user.id).eq("date", todayStr),
+        supabase.from("mp_recipes").select("*", { count: "exact", head: true }).eq("user_id", user.id),
       ]);
       setPantryCount(pCount || 0);
       setExpiringCount(expCount || 0);
       setShoppingCount(sCount || 0);
       setTodaysMeals(meals || []);
+      setRecipesCount(rCount || 0);
     }
     load();
   }, [user]);
@@ -76,6 +79,19 @@ function HomeContent() {
           </div>
           <p className="text-xs text-gray-400 mt-1">items to buy</p>
         </Link>
+
+        <Link href="/Recipes" className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Recipes</p>
+          <div className="flex items-center justify-between">
+            <p className="text-4xl font-bold text-amber-600">{recipesCount}</p>
+            <span className="text-amber-400">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">saved recipes</p>
+        </Link>
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6">
@@ -111,7 +127,7 @@ function HomeContent() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <Link href="/Pantry" className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center gap-2 hover:shadow-md transition-shadow">
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
             <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -135,6 +151,14 @@ function HomeContent() {
             </svg>
           </div>
           <span className="text-xs font-semibold text-gray-700">Meals</span>
+        </Link>
+        <Link href="/Recipes" className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center gap-2 hover:shadow-md transition-shadow">
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+            </svg>
+          </div>
+          <span className="text-xs font-semibold text-gray-700">Recipes</span>
         </Link>
       </div>
     </div>
