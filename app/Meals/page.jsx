@@ -134,7 +134,7 @@ function MealsContent() {
     return `${days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${last.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
   };
 
-  const monthLabel = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthLabel = (view === "Month" ? monthStart : weekStart).toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const selectedMeals = meals.filter((m) => m.date === selectedDate);
   const upcomingMeals = meals
     .filter((m) => m.date >= today && m.date <= toDateStr(addDays(new Date(), 7)) && !m.completed)
