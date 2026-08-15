@@ -69,6 +69,20 @@ function MealsContent() {
     });
   }, [user]);
 
+  // Auto-open Plan a Meal modal pre-filled from a pantry item
+  useEffect(() => {
+    if (pantryItems.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const planItem = params.get("planItem");
+    if (!planItem) return;
+    const matched = pantryItems.find((p) => p.name.toLowerCase() === planItem.toLowerCase());
+    setForm({ ...EMPTY_FORM, date: selectedDate, name: planItem });
+    setSelectedPantryItems(matched ? [matched] : []);
+    setPantryQuery("");
+    setModal("add");
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [pantryItems]);
+
   // Auto-open AI modal pre-filtered to expiring items when navigated from Pantry
   useEffect(() => {
     if (pantryItems.length === 0) return;

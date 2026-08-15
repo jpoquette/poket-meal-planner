@@ -230,10 +230,19 @@ function PantryContent() {
                 </div>
                 <Field label="Notes"><textarea className={inputCls} placeholder="Optional notes..." rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
               </div>
-              <div className="flex gap-2 px-5 pt-4 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
-                {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
-                <button type="button" onClick={() => setModal(null)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+              <div className="flex flex-col gap-2 px-5 pt-4 pb-4 border-t border-gray-100" style={{paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'}}>
+                {modal !== "add" && (
+                  <button type="button"
+                    onClick={() => { setModal(null); router.push(`/Meals?planItem=${encodeURIComponent(form.name)}`); }}
+                    className="w-full py-2.5 rounded-xl text-sm bg-purple-50 text-purple-700 border border-purple-200 font-medium hover:bg-purple-100">
+                    📅 Plan as Meal
+                  </button>
+                )}
+                <div className="flex gap-2">
+                  {modal !== "add" && <button type="button" onClick={() => handleDelete(modal)} className="px-4 py-2.5 rounded-xl text-sm text-red-500 border border-red-200 hover:bg-red-50">Delete</button>}
+                  <button type="button" onClick={() => setModal(null)} className="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 hover:bg-gray-50">Cancel</button>
+                  <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+                </div>
               </div>
             </form>
           </div>
