@@ -220,7 +220,7 @@ function PantryContent() {
               <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
                 <Field label="Name"><input className={inputCls} placeholder="Item name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Quantity"><input className={inputCls} type="number" min="0" placeholder="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></Field>
+                  <Field label="Quantity"><input className={inputCls} type="number" min="0" step="any" placeholder="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></Field>
                   <Field label="Unit"><select className={inputCls} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>{UNITS.map((u) => <option key={u}>{u}</option>)}</select></Field>
                 </div>
                 <Field label="Category"><select className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
